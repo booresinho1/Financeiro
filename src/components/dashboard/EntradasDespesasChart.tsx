@@ -19,6 +19,10 @@ const MESES_ABREV = [
   'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez',
 ]
 
+function formatCurrencyCompacto(v: number): string {
+  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+}
+
 interface EntradasDespesasChartProps {
   entradas: Entrada[]
   despesas: Despesa[]
@@ -109,9 +113,9 @@ export function EntradasDespesasChart({
           <LabelList
             dataKey="Entradas"
             position="top"
-            formatter={(v) => formatCurrency(Number(v))}
+            formatter={(v) => (Number(v) > 0 ? formatCurrencyCompacto(Number(v)) : '')}
             fill={INK_SECUNDARIA}
-            fontSize={9.5}
+            fontSize={9}
             fontWeight={600}
           />
         </Bar>
@@ -119,9 +123,9 @@ export function EntradasDespesasChart({
           <LabelList
             dataKey="Despesas"
             position="top"
-            formatter={(v) => formatCurrency(Number(v))}
+            formatter={(v) => (Number(v) > 0 ? formatCurrencyCompacto(Number(v)) : '')}
             fill={INK_SECUNDARIA}
-            fontSize={9.5}
+            fontSize={9}
             fontWeight={600}
           />
         </Bar>

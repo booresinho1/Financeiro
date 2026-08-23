@@ -64,6 +64,31 @@ function custoFixoAtivoNoMes(c: CustoFixo, mes: string): boolean {
   return true
 }
 
+interface RotuloSegmentoProps {
+  x?: number
+  y?: number
+  width?: number
+  height?: number
+  value?: number
+}
+
+function RotuloSegmento({ x, y, width, height, value }: RotuloSegmentoProps) {
+  if (!value || !height || height < 18 || x === undefined || y === undefined || !width) return null
+  return (
+    <text
+      x={x + width / 2}
+      y={y + height / 2}
+      textAnchor="middle"
+      dominantBaseline="central"
+      fill="#ffffff"
+      fontSize={10.5}
+      fontWeight={600}
+    >
+      {formatCurrency(value)}
+    </text>
+  )
+}
+
 export function ComprometimentoMensalChart({
   custosFixos,
   parcelas,
@@ -129,24 +154,10 @@ export function ComprometimentoMensalChart({
         <Tooltip content={<TooltipConteudo />} cursor={{ fill: cursorFill }} />
         <Legend wrapperStyle={{ fontSize: 12, color: INK_MUTED }} iconType="circle" iconSize={8} />
         <Bar dataKey="Custos fixos" stackId="comprometido" fill={COR_CUSTO_FIXO} radius={[0, 0, 0, 0]} maxBarSize={40}>
-          <LabelList
-            dataKey="Custos fixos"
-            position="center"
-            formatter={(v) => (Number(v) > 0 ? formatCurrency(Number(v)) : '')}
-            fill="#ffffff"
-            fontSize={10.5}
-            fontWeight={600}
-          />
+          <LabelList dataKey="Custos fixos" content={<RotuloSegmento />} />
         </Bar>
         <Bar dataKey="Dívidas" stackId="comprometido" fill={COR_DIVIDA} radius={[4, 4, 0, 0]} maxBarSize={40}>
-          <LabelList
-            dataKey="Dívidas"
-            position="center"
-            formatter={(v) => (Number(v) > 0 ? formatCurrency(Number(v)) : '')}
-            fill="#ffffff"
-            fontSize={10.5}
-            fontWeight={600}
-          />
+          <LabelList dataKey="Dívidas" content={<RotuloSegmento />} />
         </Bar>
       </BarChart>
     </ResponsiveContainer>
