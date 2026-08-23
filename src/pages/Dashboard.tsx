@@ -98,7 +98,7 @@ export function Dashboard() {
   const [periodo, setPeriodo] = useState(periodoAtual())
   const [mesInicialComprometido, setMesInicialComprometido] = useState(periodoAtual())
   const [mesFinalComprometido, setMesFinalComprometido] = useState(
-    somarMeses(`${periodoAtual()}-01`, 5).slice(0, 7)
+    somarMeses(`${periodoAtual()}-01`, 2).slice(0, 7)
   )
 
   const dadosSaldo = { despesas, entradas, movimentacoes }
@@ -288,14 +288,14 @@ export function Dashboard() {
           <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
             Evolução do comprometimento mensal
           </span>
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
             <label className="text-xs text-ink-muted">De</label>
             <input
               type="month"
               value={mesInicialComprometido}
               max={mesFinalComprometido}
               onChange={(e) => e.target.value && setMesInicialComprometido(e.target.value)}
-              className="rounded-lg border border-line px-2.5 py-1.5 text-sm text-ink-soft"
+              className="min-w-0 rounded-lg border border-line px-2.5 py-1.5 text-sm text-ink-soft"
             />
             <label className="text-xs text-ink-muted">até</label>
             <input
@@ -303,7 +303,7 @@ export function Dashboard() {
               value={mesFinalComprometido}
               min={mesInicialComprometido}
               onChange={(e) => e.target.value && setMesFinalComprometido(e.target.value)}
-              className="rounded-lg border border-line px-2.5 py-1.5 text-sm text-ink-soft"
+              className="min-w-0 rounded-lg border border-line px-2.5 py-1.5 text-sm text-ink-soft"
             />
           </div>
         </div>

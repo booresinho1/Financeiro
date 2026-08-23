@@ -117,14 +117,14 @@ export function Dividas() {
             <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
               Evolução do comprometimento mensal
             </span>
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
               <label className="text-xs text-ink-muted">De</label>
               <input
                 type="month"
                 value={mesInicial}
                 max={mesFinal}
                 onChange={(e) => e.target.value && setMesInicial(e.target.value)}
-                className="rounded-lg border border-line px-2.5 py-1.5 text-sm text-ink-soft"
+                className="min-w-0 rounded-lg border border-line px-2.5 py-1.5 text-sm text-ink-soft"
               />
               <label className="text-xs text-ink-muted">até</label>
               <input
@@ -132,7 +132,7 @@ export function Dividas() {
                 value={mesFinal}
                 min={mesInicial}
                 onChange={(e) => e.target.value && setMesFinal(e.target.value)}
-                className="rounded-lg border border-line px-2.5 py-1.5 text-sm text-ink-soft"
+                className="min-w-0 rounded-lg border border-line px-2.5 py-1.5 text-sm text-ink-soft"
               />
             </div>
           </div>
