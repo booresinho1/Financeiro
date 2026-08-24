@@ -21,6 +21,7 @@ import { useEntradas } from '@/hooks/useEntradas'
 import { useContas } from '@/hooks/useContas'
 import { useMovimentacoes } from '@/hooks/useMovimentacoes'
 import { useCustosFixos } from '@/hooks/useCustosFixos'
+import { usePagamentosCustosFixos } from '@/hooks/usePagamentosCustosFixos'
 import { useParcelas } from '@/hooks/useParcelas'
 import { useMetas } from '@/hooks/useMetas'
 import { calcularSaldo, calcularTotalEmContas } from '@/lib/saldos'
@@ -92,6 +93,7 @@ export function Dashboard() {
   const { contas } = useContas()
   const { movimentacoes } = useMovimentacoes()
   const { custosFixos } = useCustosFixos()
+  const { pagamentos: pagamentosCustosFixos } = usePagamentosCustosFixos()
   const { parcelas } = useParcelas()
   const { metas } = useMetas()
 
@@ -137,9 +139,14 @@ export function Dashboard() {
   const custosFixosDoPeriodo = useMemo(
     () =>
       custosFixos
-        .filter((c) => c.ativo && c.dataInicio.slice(0, 7) <= periodo)
+        .filter(
+          (c) =>
+            c.ativo &&
+            c.dataInicio.slice(0, 7) <= periodo &&
+            !pagamentosCustosFixos.some((p) => p.idCustoFixo === c.id && p.periodo === periodo)
+        )
         .reduce((s, c) => s + c.valorPrevisto, 0),
-    [custosFixos, periodo]
+    [custosFixos, pagamentosCustosFixos, periodo]
   )
   const parcelasDoPeriodo = useMemo(
     () =>
@@ -317,6 +324,7 @@ export function Dashboard() {
         </p>
         <ComprometimentoMensalChart
           custosFixos={custosFixos}
+          pagamentosCustosFixos={pagamentosCustosFixos}
           parcelas={parcelas}
           mesInicial={mesInicialComprometido}
           mesFinal={mesFinalComprometido}

@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import type { CustoFixo, Parcela } from '@/types/finance'
+import type { CustoFixo, PagamentoCustoFixo, Parcela } from '@/types/finance'
 import { formatCurrency } from '@/lib/format'
 import { somarMeses } from '@/lib/datas'
 import { statusEfetivoParcela } from '@/lib/dividaResumo'
@@ -22,6 +22,7 @@ const MESES_ABREV = [
 
 interface ComprometimentoMensalChartProps {
   custosFixos: CustoFixo[]
+  pagamentosCustosFixos: PagamentoCustoFixo[]
   parcelas: Parcela[]
   mesInicial: string
   mesFinal: string
@@ -57,10 +58,15 @@ function labelDoMes(mes: string): string {
   return `${MESES_ABREV[Number(m) - 1]}/${ano.slice(2)}`
 }
 
-function custoFixoAtivoNoMes(c: CustoFixo, mes: string): boolean {
+function custoFixoAtivoNoMes(
+  c: CustoFixo,
+  mes: string,
+  pagamentos: PagamentoCustoFixo[]
+): boolean {
   if (!c.ativo) return false
   if (c.dataInicio.slice(0, 7) > mes) return false
   if (c.dataFim && c.dataFim.slice(0, 7) < mes) return false
+  if (pagamentos.some((p) => p.idCustoFixo === c.id && p.periodo === mes)) return false
   return true
 }
 
@@ -91,6 +97,7 @@ function RotuloSegmento({ x, y, width, height, value }: RotuloSegmentoProps) {
 
 export function ComprometimentoMensalChart({
   custosFixos,
+  pagamentosCustosFixos,
   parcelas,
   mesInicial,
   mesFinal,
@@ -115,14 +122,14 @@ export function ComprometimentoMensalChart({
 
     return meses.map((mes) => {
       const custoFixoTotal = custosFixos
-        .filter((c) => custoFixoAtivoNoMes(c, mes))
+        .filter((c) => custoFixoAtivoNoMes(c, mes, pagamentosCustosFixos))
         .reduce((s, c) => s + c.valorPrevisto, 0)
       const dividaTotal = pendentes
         .filter((p) => p.dataVencimento.slice(0, 7) === mes)
         .reduce((s, p) => s + p.valorPrevisto, 0)
       return { mes: labelDoMes(mes), 'Custos fixos': custoFixoTotal, 'Dívidas': dividaTotal }
     })
-  }, [custosFixos, parcelas, mesInicial, mesFinal])
+  }, [custosFixos, pagamentosCustosFixos, parcelas, mesInicial, mesFinal])
 
   const semDados = dados.every((d) => d['Custos fixos'] === 0 && d['Dívidas'] === 0)
 
