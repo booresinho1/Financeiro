@@ -26,8 +26,7 @@ export function ComboBox({
   const sugestoes = useMemo(() => {
     const termo = value.trim().toLowerCase()
     const filtradas = termo ? opcoes.filter((o) => o.toLowerCase().includes(termo)) : opcoes
-    const lista = filtradas.length > 0 ? filtradas : opcoes
-    return lista.slice(0, 8)
+    return filtradas.slice(0, 8)
   }, [opcoes, value])
 
   function escolher(opcao: string) {

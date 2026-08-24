@@ -63,9 +63,14 @@ export function ContaFormModal({ conta, onClose, onSubmit }: ContaFormModalProps
             onChange={(e) => setTipo(e.target.value as TipoConta)}
             className="w-full rounded-xl border border-line px-3.5 py-2.5 text-sm"
           >
-            <option value="MANUAL">Manual (só muda por movimentação)</option>
-            <option value="AUTOMATICA">Automática (soma entradas e despesas do Sheets)</option>
+            <option value="MANUAL">Manual</option>
+            <option value="AUTOMATICA">Automática</option>
           </select>
+          <p className="text-xs text-ink-faint mt-1">
+            {tipo === 'AUTOMATICA'
+              ? 'O saldo é calculado sozinho: soma todas as entradas recebidas e subtrai todas as despesas. Use para sua conta principal do dia a dia.'
+              : 'O saldo só muda quando você registra uma movimentação manual (em Contas). Entradas e despesas não afetam esse saldo. Use para reservas e metas.'}
+          </p>
         </div>
 
         <div>

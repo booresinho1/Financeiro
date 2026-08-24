@@ -205,6 +205,11 @@ export function Dashboard() {
           icone={Wallet}
           cor="text-income"
           corFundo="bg-income-soft"
+          nota={
+            !contaAutomatica
+              ? 'Crie uma conta do tipo Automática em Contas pra este número funcionar'
+              : undefined
+          }
         />
         <CardIndicador
           titulo="Total em contas"

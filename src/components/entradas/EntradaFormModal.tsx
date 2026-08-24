@@ -140,6 +140,9 @@ export function EntradaFormModal({
         <div>
           <label className="block text-sm font-medium text-ink-soft mb-1">Conta de destino</label>
           <ComboBox value={contaDestino} onChange={setContaDestino} opcoes={contas} required />
+          <p className="text-xs text-ink-faint mt-1">
+            Só afeta o saldo se a conta for do tipo Automática. Contas Manuais só mudam por movimentação.
+          </p>
         </div>
 
         <div>
