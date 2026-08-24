@@ -8,6 +8,7 @@ export default criarCrudDeTabela({
     { nome: 'nome', coluna: 'nome' },
     { nome: 'tipo', coluna: 'tipo' },
     { nome: 'saldoInicial', coluna: 'saldo_inicial', numero: true },
+    { nome: 'dataSaldoInicial', coluna: 'data_saldo_inicial', opcional: true },
     { nome: 'ativa', coluna: 'ativa' },
   ],
 })

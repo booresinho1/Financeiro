@@ -8,8 +8,10 @@ interface DadosSaldo {
 
 export function calcularSaldo(conta: Conta, dados: DadosSaldo, ateData?: string): number {
   let saldo = conta.saldoInicial
+  const desdeData = conta.dataSaldoInicial
 
   for (const mov of dados.movimentacoes) {
+    if (desdeData && mov.data < desdeData) continue
     if (ateData && mov.data > ateData) continue
     if (mov.tipo === 'ENTRADA' && mov.conta === conta.nome) saldo += mov.valor
     if (mov.tipo === 'RETIRADA' && mov.conta === conta.nome) saldo -= mov.valor
@@ -22,10 +24,12 @@ export function calcularSaldo(conta: Conta, dados: DadosSaldo, ateData?: string)
   if (conta.tipo === 'AUTOMATICA') {
     for (const entrada of dados.entradas) {
       if (entrada.status !== 'RECEBIDA') continue
+      if (desdeData && entrada.data < desdeData) continue
       if (ateData && entrada.data > ateData) continue
       if (entrada.contaDestino === conta.nome) saldo += entrada.valor
     }
     for (const despesa of dados.despesas) {
+      if (desdeData && despesa.data < desdeData) continue
       if (ateData && despesa.data > ateData) continue
       saldo -= despesa.valor
     }

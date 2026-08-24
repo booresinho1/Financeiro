@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import type { Conta, TipoConta } from '@/types/finance'
 import type { NovaConta } from '@/repositories/contasRepository'
+import { hojeIso } from '@/lib/datas'
 
 interface ContaFormModalProps {
   conta?: Conta
@@ -13,6 +14,7 @@ export function ContaFormModal({ conta, onClose, onSubmit }: ContaFormModalProps
   const [nome, setNome] = useState(conta?.nome ?? '')
   const [tipo, setTipo] = useState<TipoConta>(conta?.tipo ?? 'MANUAL')
   const [saldoInicial, setSaldoInicial] = useState(conta ? String(conta.saldoInicial) : '0')
+  const [dataSaldoInicial, setDataSaldoInicial] = useState(conta?.dataSaldoInicial ?? '')
   const [ativa, setAtiva] = useState(conta?.ativa ?? true)
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -32,6 +34,7 @@ export function ContaFormModal({ conta, onClose, onSubmit }: ContaFormModalProps
         nome: nome.trim(),
         tipo,
         saldoInicial: Number(saldoInicial.replace(',', '.')) || 0,
+        dataSaldoInicial: dataSaldoInicial || undefined,
         ativa,
       })
       onClose()
@@ -82,6 +85,32 @@ export function ContaFormModal({ conta, onClose, onSubmit }: ContaFormModalProps
             onChange={(e) => setSaldoInicial(e.target.value)}
             className="w-full rounded-xl border border-line px-3.5 py-2.5 text-sm"
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-ink-soft mb-1">
+            Valer a partir de <span className="text-ink-faint font-normal">(opcional)</span>
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="date"
+              value={dataSaldoInicial}
+              onChange={(e) => setDataSaldoInicial(e.target.value)}
+              className="flex-1 rounded-xl border border-line px-3.5 py-2.5 text-sm"
+            />
+            <button
+              type="button"
+              onClick={() => setDataSaldoInicial(hojeIso())}
+              className="shrink-0 rounded-xl border border-line px-3.5 text-sm font-medium text-ink-soft hover:bg-surface-2"
+            >
+              Hoje
+            </button>
+          </div>
+          <p className="text-xs text-ink-faint mt-1">
+            {dataSaldoInicial
+              ? 'Lançamentos anteriores a essa data são ignorados no cálculo do saldo — é como zerar o histórico e recomeçar a contar a partir do valor acima.'
+              : 'Deixe em branco pra manter o comportamento padrão: soma tudo desde o começo.'}
+          </p>
         </div>
 
         <label className="flex items-center gap-2 text-sm text-ink-soft">

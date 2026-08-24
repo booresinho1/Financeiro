@@ -27,6 +27,7 @@ export interface Conta {
   nome: string
   tipo: TipoConta
   saldoInicial: number
+  dataSaldoInicial?: string
   ativa: boolean
 }
 
