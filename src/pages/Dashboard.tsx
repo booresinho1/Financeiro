@@ -18,6 +18,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { EntradasDespesasChart } from '@/components/dashboard/EntradasDespesasChart'
 import { DespesasPorCategoriaChart } from '@/components/dashboard/DespesasPorCategoriaChart'
 import { ComprometimentoMensalChart } from '@/components/dashboard/ComprometimentoMensalChart'
+import { GastoPorDiaSemanaChart } from '@/components/dashboard/GastoPorDiaSemanaChart'
 import { useDespesas } from '@/hooks/useDespesas'
 import { useEntradas } from '@/hooks/useEntradas'
 import { useContas } from '@/hooks/useContas'
@@ -457,6 +458,14 @@ export function Dashboard() {
               </table>
             </div>
           )}
+        </CardBase>
+      </div>
+
+      <div className="mt-3">
+        <CardBase eyebrow="Gasto médio por dia da semana — Lazer e Alimentação">
+          <div className="mt-2">
+            <GastoPorDiaSemanaChart despesas={despesas} />
+          </div>
         </CardBase>
       </div>
 
