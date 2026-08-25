@@ -25,7 +25,7 @@ interface GastoPorDiaSemanaChartProps {
 
 interface TooltipProps {
   active?: boolean
-  payload?: { name: string; value: number; color: string }[]
+  payload?: { name: string; value: number; color: string; payload: Record<string, number> }[]
   label?: string
 }
 
@@ -34,12 +34,18 @@ function TooltipConteudo({ active, payload, label }: TooltipProps) {
   return (
     <div className="rounded-lg border border-line bg-surface px-3 py-2 text-xs shadow-sm space-y-1">
       <p className="font-medium text-ink">{label}</p>
-      {payload.map((item) => (
-        <p key={item.name} className="flex items-center gap-1.5 text-ink-muted">
-          <span className="inline-block h-2 w-2 rounded-full" style={{ background: item.color }} />
-          {item.name}: {formatCurrency(item.value)}
-        </p>
-      ))}
+      {payload.map((item) => {
+        const ocorrencias = item.payload[`${item.name}Ocorrencias`] ?? 0
+        return (
+          <p key={item.name} className="flex items-center gap-1.5 text-ink-muted">
+            <span className="inline-block h-2 w-2 rounded-full" style={{ background: item.color }} />
+            {item.name}: {formatCurrency(item.value)}
+            <span className="text-ink-faint">
+              ({ocorrencias} {ocorrencias === 1 ? 'dia' : 'dias'})
+            </span>
+          </p>
+        )
+      })}
     </div>
   )
 }
@@ -52,10 +58,8 @@ export function GastoPorDiaSemanaChart({ despesas }: GastoPorDiaSemanaChartProps
     const relevantes = despesas.filter((d) => CATEGORIAS.includes(d.categoria as (typeof CATEGORIAS)[number]))
     if (relevantes.length === 0) return null
 
-    const datas = despesas.map((d) => d.data).sort()
-    const primeira = new Date(datas[0])
-    const ultima = new Date(datas[datas.length - 1])
-
+    // Soma por data+categoria primeiro, pra vários lançamentos no mesmo dia contarem
+    // como um "dia com gasto" só, não vários.
     const somaPorDataPorCategoria = new Map<string, Record<string, number>>()
     for (const d of relevantes) {
       const doDia = somaPorDataPorCategoria.get(d.data) ?? {}
@@ -67,24 +71,28 @@ export function GastoPorDiaSemanaChart({ despesas }: GastoPorDiaSemanaChartProps
       LAZER: Array(7).fill(0),
       ALIMENTAÇÃO: Array(7).fill(0),
     }
-    const contagemPorDiaSemana = Array(7).fill(0)
+    const ocorrenciasPorDiaSemana: Record<string, number[]> = {
+      LAZER: Array(7).fill(0),
+      ALIMENTAÇÃO: Array(7).fill(0),
+    }
 
-    const cursor = new Date(primeira)
-    while (cursor <= ultima) {
-      const iso = cursor.toISOString().slice(0, 10)
-      const wd = cursor.getDay()
-      const doDia = somaPorDataPorCategoria.get(iso)
+    for (const [dataIso, valoresPorCategoria] of somaPorDataPorCategoria) {
+      const wd = new Date(dataIso).getDay()
       for (const cat of CATEGORIAS) {
-        somaPorDiaSemana[cat][wd] += doDia?.[cat] ?? 0
+        if (valoresPorCategoria[cat] === undefined) continue
+        somaPorDiaSemana[cat][wd] += valoresPorCategoria[cat]
+        ocorrenciasPorDiaSemana[cat][wd] += 1
       }
-      contagemPorDiaSemana[wd] += 1
-      cursor.setDate(cursor.getDate() + 1)
     }
 
     return ORDEM_SEMANA.map((wd, i) => ({
       dia: DIAS_ABREV[i],
-      Lazer: contagemPorDiaSemana[wd] ? somaPorDiaSemana.LAZER[wd] / contagemPorDiaSemana[wd] : 0,
-      Alimentação: contagemPorDiaSemana[wd] ? somaPorDiaSemana.ALIMENTAÇÃO[wd] / contagemPorDiaSemana[wd] : 0,
+      Lazer: ocorrenciasPorDiaSemana.LAZER[wd] ? somaPorDiaSemana.LAZER[wd] / ocorrenciasPorDiaSemana.LAZER[wd] : 0,
+      Alimentação: ocorrenciasPorDiaSemana.ALIMENTAÇÃO[wd]
+        ? somaPorDiaSemana.ALIMENTAÇÃO[wd] / ocorrenciasPorDiaSemana.ALIMENTAÇÃO[wd]
+        : 0,
+      LazerOcorrencias: ocorrenciasPorDiaSemana.LAZER[wd],
+      AlimentaçãoOcorrencias: ocorrenciasPorDiaSemana.ALIMENTAÇÃO[wd],
     }))
   }, [despesas])
 
