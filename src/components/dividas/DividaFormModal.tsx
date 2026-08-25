@@ -3,8 +3,10 @@ import { Modal } from '@/components/ui/Modal'
 import { SeletorCategoria } from '@/components/shared/SeletorCategoria'
 import { SeletorSubcategoria } from '@/components/shared/SeletorSubcategoria'
 import type { NovaDivida } from '@/repositories/dividasRepository'
+import type { Divida } from '@/types/finance'
 
 interface DividaFormModalProps {
+  divida?: Divida
   onClose: () => void
   onSubmit: (dados: NovaDivida) => Promise<void>
 }
@@ -13,21 +15,22 @@ function hoje() {
   return new Date().toISOString().slice(0, 10)
 }
 
-export function DividaFormModal({ onClose, onSubmit }: DividaFormModalProps) {
-  const [descricao, setDescricao] = useState('')
-  const [valorTotal, setValorTotal] = useState('')
-  const [numParcelas, setNumParcelas] = useState('1')
-  const [valorParcela, setValorParcela] = useState('')
-  const [primeiroVencimento, setPrimeiroVencimento] = useState(hoje())
-  const [categoria, setCategoria] = useState('')
-  const [subcategoria, setSubcategoria] = useState('')
-  const [observacao, setObservacao] = useState('')
+export function DividaFormModal({ divida, onClose, onSubmit }: DividaFormModalProps) {
+  const editando = !!divida
+  const [descricao, setDescricao] = useState(divida?.descricao ?? '')
+  const [valorTotal, setValorTotal] = useState(divida ? String(divida.valorTotal) : '')
+  const [numParcelas, setNumParcelas] = useState(divida ? String(divida.numParcelas) : '1')
+  const [valorParcela, setValorParcela] = useState(divida ? String(divida.valorParcela) : '')
+  const [primeiroVencimento, setPrimeiroVencimento] = useState(divida?.primeiroVencimento ?? hoje())
+  const [categoria, setCategoria] = useState(divida?.categoria ?? '')
+  const [subcategoria, setSubcategoria] = useState(divida?.subcategoria ?? '')
+  const [observacao, setObservacao] = useState(divida?.observacao ?? '')
   const [salvando, setSalvando] = useState(false)
   const [progresso, setProgresso] = useState<string | null>(null)
   const [erro, setErro] = useState<string | null>(null)
 
   // Recalcula o valor da parcela automaticamente enquanto o usuário não editar esse campo manualmente.
-  const [valorParcelaEditadoManualmente, setValorParcelaEditadoManualmente] = useState(false)
+  const [valorParcelaEditadoManualmente, setValorParcelaEditadoManualmente] = useState(editando)
 
   useEffect(() => {
     if (valorParcelaEditadoManualmente) return
@@ -51,7 +54,7 @@ export function DividaFormModal({ onClose, onSubmit }: DividaFormModalProps) {
 
     setSalvando(true)
     setErro(null)
-    setProgresso(`Gerando ${n} parcela(s)...`)
+    setProgresso(editando ? null : `Gerando ${n} parcela(s)...`)
     try {
       await onSubmit({
         descricao: descricao.trim(),
@@ -72,7 +75,7 @@ export function DividaFormModal({ onClose, onSubmit }: DividaFormModalProps) {
   }
 
   return (
-    <Modal title="Nova dívida" onClose={onClose}>
+    <Modal title={editando ? 'Editar dívida' : 'Nova dívida'} onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-3">
         <div>
           <label className="block text-sm font-medium text-ink-soft mb-1">Descrição</label>
@@ -86,6 +89,13 @@ export function DividaFormModal({ onClose, onSubmit }: DividaFormModalProps) {
           />
         </div>
 
+        {editando && (
+          <p className="text-xs text-ink-faint bg-surface-2 rounded-lg px-3 py-2">
+            Valor total, número de parcelas e vencimento não podem ser alterados depois de criada a
+            dívida, porque as parcelas já foram geradas (e algumas podem já estar pagas).
+          </p>
+        )}
+
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="block text-sm font-medium text-ink-soft mb-1">
@@ -97,7 +107,8 @@ export function DividaFormModal({ onClose, onSubmit }: DividaFormModalProps) {
               min="0"
               value={valorTotal}
               onChange={(e) => setValorTotal(e.target.value)}
-              className="w-full rounded-xl border border-line px-3.5 py-2.5 text-sm"
+              disabled={editando}
+              className="w-full rounded-xl border border-line px-3.5 py-2.5 text-sm disabled:bg-surface-2 disabled:text-ink-faint"
               required
             />
           </div>
@@ -108,7 +119,8 @@ export function DividaFormModal({ onClose, onSubmit }: DividaFormModalProps) {
               min="1"
               value={numParcelas}
               onChange={(e) => setNumParcelas(e.target.value)}
-              className="w-full rounded-xl border border-line px-3.5 py-2.5 text-sm"
+              disabled={editando}
+              className="w-full rounded-xl border border-line px-3.5 py-2.5 text-sm disabled:bg-surface-2 disabled:text-ink-faint"
               required
             />
           </div>
@@ -127,10 +139,13 @@ export function DividaFormModal({ onClose, onSubmit }: DividaFormModalProps) {
               setValorParcela(e.target.value)
               setValorParcelaEditadoManualmente(true)
             }}
-            className="w-full rounded-xl border border-line px-3.5 py-2.5 text-sm"
+            disabled={editando}
+            className="w-full rounded-xl border border-line px-3.5 py-2.5 text-sm disabled:bg-surface-2 disabled:text-ink-faint"
             required
           />
-          <p className="text-xs text-ink-faint mt-1">Calculado automaticamente, mas pode ajustar.</p>
+          {!editando && (
+            <p className="text-xs text-ink-faint mt-1">Calculado automaticamente, mas pode ajustar.</p>
+          )}
         </div>
 
         <div>
@@ -141,7 +156,8 @@ export function DividaFormModal({ onClose, onSubmit }: DividaFormModalProps) {
             type="date"
             value={primeiroVencimento}
             onChange={(e) => setPrimeiroVencimento(e.target.value)}
-            className="w-full rounded-xl border border-line px-3.5 py-2.5 text-sm"
+            disabled={editando}
+            className="w-full rounded-xl border border-line px-3.5 py-2.5 text-sm disabled:bg-surface-2 disabled:text-ink-faint"
             required
           />
         </div>
@@ -192,7 +208,7 @@ export function DividaFormModal({ onClose, onSubmit }: DividaFormModalProps) {
             disabled={salvando}
             className="flex-1 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-hover shadow-sm shadow-black/10 disabled:opacity-60"
           >
-            {salvando ? 'Salvando...' : 'Salvar'}
+            {salvando ? 'Salvando...' : editando ? 'Salvar alterações' : 'Salvar'}
           </button>
         </div>
       </form>

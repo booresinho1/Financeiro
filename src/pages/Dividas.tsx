@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Plus, CreditCard, ChevronDown, Ban, Check } from 'lucide-react'
+import { Plus, CreditCard, ChevronDown, Ban, Check, Pencil } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { DividaFormModal } from '@/components/dividas/DividaFormModal'
@@ -27,7 +27,14 @@ const STATUS_COR: Record<string, string> = {
 }
 
 export function Dividas() {
-  const { dividas, carregando, erro, excluir, recarregar: recarregarDividas } = useDividas()
+  const {
+    dividas,
+    carregando,
+    erro,
+    excluir,
+    atualizar: atualizarDivida,
+    recarregar: recarregarDividas,
+  } = useDividas()
   const {
     parcelas,
     atualizar: atualizarParcela,
@@ -37,6 +44,7 @@ export function Dividas() {
   const { despesas } = useDespesas()
 
   const [modalDividaAberto, setModalDividaAberto] = useState(false)
+  const [dividaEditando, setDividaEditando] = useState<Divida | undefined>()
   const [dividaExpandida, setDividaExpandida] = useState<string | null>(null)
   const [parcelaPagando, setParcelaPagando] = useState<Parcela | null>(null)
   const [mesInicial, setMesInicial] = useState(periodoAtual())
@@ -51,9 +59,23 @@ export function Dividas() {
     return { totalRestante }
   }, [dividas, parcelas])
 
-  async function handleCriarDivida(dados: NovaDivida) {
-    await criarDividaComParcelas(dados)
-    await Promise.all([recarregarDividas(), recarregarParcelas()])
+  async function handleSalvarDivida(dados: NovaDivida) {
+    if (dividaEditando) {
+      await atualizarDivida(dividaEditando.id, dados)
+    } else {
+      await criarDividaComParcelas(dados)
+      await Promise.all([recarregarDividas(), recarregarParcelas()])
+    }
+  }
+
+  function abrirNovaDivida() {
+    setDividaEditando(undefined)
+    setModalDividaAberto(true)
+  }
+
+  function abrirEdicaoDivida(divida: Divida) {
+    setDividaEditando(divida)
+    setModalDividaAberto(true)
   }
 
   async function handleExcluirDivida(divida: Divida) {
@@ -88,7 +110,7 @@ export function Dividas() {
         subtitle={`Total restante: ${formatCurrency(resumoGeral.totalRestante)}`}
         action={
           <button
-            onClick={() => setModalDividaAberto(true)}
+            onClick={abrirNovaDivida}
             className="flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-hover shadow-sm shadow-black/10"
           >
             <Plus className="h-4 w-4" />
@@ -165,12 +187,21 @@ export function Dividas() {
                         ` · Término previsto: ${formatDate(resumo.dataPrevistaTermino)}`}
                     </p>
                   </div>
-                  <button
-                    onClick={() => handleExcluirDivida(divida)}
-                    className="text-xs font-medium text-expense shrink-0"
-                  >
-                    Excluir
-                  </button>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <button
+                      onClick={() => abrirEdicaoDivida(divida)}
+                      className="flex items-center gap-1 text-xs font-medium text-ink-soft"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => handleExcluirDivida(divida)}
+                      className="text-xs font-medium text-expense"
+                    >
+                      Excluir
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex items-baseline justify-between mt-3">
@@ -256,8 +287,9 @@ export function Dividas() {
 
       {modalDividaAberto && (
         <DividaFormModal
+          divida={dividaEditando}
           onClose={() => setModalDividaAberto(false)}
-          onSubmit={handleCriarDivida}
+          onSubmit={handleSalvarDivida}
         />
       )}
 

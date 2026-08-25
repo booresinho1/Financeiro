@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { dividasRepository } from '@/repositories/dividasRepository'
+import { dividasRepository, type NovaDivida } from '@/repositories/dividasRepository'
 import type { Divida } from '@/types/finance'
 
 export function useDividas() {
@@ -29,5 +29,10 @@ export function useDividas() {
     setDividas((atual) => atual.filter((d) => d.id !== id))
   }, [])
 
-  return { dividas, carregando, erro, recarregar: carregar, excluir }
+  const atualizar = useCallback(async (id: string, dados: NovaDivida) => {
+    const atualizada = await dividasRepository.atualizar(id, dados)
+    setDividas((atual) => atual.map((d) => (d.id === id ? atualizada : d)))
+  }, [])
+
+  return { dividas, carregando, erro, recarregar: carregar, excluir, atualizar }
 }
