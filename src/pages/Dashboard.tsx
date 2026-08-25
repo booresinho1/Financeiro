@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  ArrowUpDown,
 } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { EntradasDespesasChart } from '@/components/dashboard/EntradasDespesasChart'
@@ -104,6 +105,8 @@ export function Dashboard() {
     somarMeses(`${periodoAtual()}-01`, 2).slice(0, 7)
   )
   const [categoriaSelecionada, setCategoriaSelecionada] = useState<string | null>(null)
+  const [ordenarTabelaPor, setOrdenarTabelaPor] = useState<'data' | 'valor'>('data')
+  const [ordemTabelaAsc, setOrdemTabelaAsc] = useState(false)
 
   useEffect(() => {
     setCategoriaSelecionada(null)
@@ -136,13 +139,26 @@ export function Dashboard() {
     () => despesas.filter((d) => d.data.slice(0, 7) === periodo),
     [despesas, periodo]
   )
-  const despesasDaTabela = useMemo(
-    () =>
-      [...despesasFiltradas]
-        .filter((d) => !categoriaSelecionada || d.categoria === categoriaSelecionada)
-        .sort((a, b) => b.data.localeCompare(a.data)),
-    [despesasFiltradas, categoriaSelecionada]
-  )
+  const despesasDaTabela = useMemo(() => {
+    const filtradas = despesasFiltradas.filter(
+      (d) => !categoriaSelecionada || d.categoria === categoriaSelecionada
+    )
+    return [...filtradas].sort((a, b) => {
+      let comparacao = 0
+      if (ordenarTabelaPor === 'valor') comparacao = a.valor - b.valor
+      else comparacao = a.data.localeCompare(b.data)
+      return ordemTabelaAsc ? comparacao : -comparacao
+    })
+  }, [despesasFiltradas, categoriaSelecionada, ordenarTabelaPor, ordemTabelaAsc])
+
+  function alternarOrdenacaoTabela(campo: 'data' | 'valor') {
+    if (ordenarTabelaPor === campo) {
+      setOrdemTabelaAsc((atual) => !atual)
+    } else {
+      setOrdenarTabelaPor(campo)
+      setOrdemTabelaAsc(false)
+    }
+  }
   const despesasDoPeriodo = useMemo(
     () => despesasFiltradas.reduce((s, d) => s + d.valor, 0),
     [despesasFiltradas]
@@ -384,10 +400,27 @@ export function Dashboard() {
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-surface-2">
                   <tr className="text-left text-ink-faint">
-                    <th className="px-3 py-2 font-medium">Data</th>
+                    <th className="px-3 py-2 font-medium">
+                      <button
+                        onClick={() => alternarOrdenacaoTabela('data')}
+                        className="flex items-center gap-1 hover:text-ink"
+                      >
+                        Data
+                        <ArrowUpDown className="h-3.5 w-3.5" />
+                      </button>
+                    </th>
                     <th className="px-3 py-2 font-medium">Descrição</th>
                     <th className="px-3 py-2 font-medium">Categoria</th>
-                    <th className="px-3 py-2 font-medium text-right">Valor</th>
+                    <th className="px-3 py-2 font-medium">Subcategoria</th>
+                    <th className="px-3 py-2 font-medium text-right">
+                      <button
+                        onClick={() => alternarOrdenacaoTabela('valor')}
+                        className="flex items-center gap-1 hover:text-ink ml-auto"
+                      >
+                        Valor
+                        <ArrowUpDown className="h-3.5 w-3.5" />
+                      </button>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -398,6 +431,9 @@ export function Dashboard() {
                       </td>
                       <td className="px-3 py-2 text-ink truncate max-w-[160px]">{d.descricao}</td>
                       <td className="px-3 py-2 text-ink-muted whitespace-nowrap">{d.categoria}</td>
+                      <td className="px-3 py-2 text-ink-muted whitespace-nowrap">
+                        {d.subcategoria}
+                      </td>
                       <td className="px-3 py-2 text-right font-medium text-ink whitespace-nowrap">
                         {formatCurrency(d.valor)}
                       </td>
