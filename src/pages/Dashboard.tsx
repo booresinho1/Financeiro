@@ -116,6 +116,16 @@ export function Dashboard() {
 
   const contaAutomatica = contas.find((c) => c.tipo === 'AUTOMATICA' && c.ativa)
   const dinheiroDisponivel = contaAutomatica ? calcularSaldo(contaAutomatica, dadosSaldo) : 0
+
+  const ehMesAtual = periodo === periodoAtual()
+  const diasRestantesMes = useMemo(() => {
+    if (!ehMesAtual) return null
+    const hoje = new Date()
+    const ultimoDiaMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate()
+    return ultimoDiaMes - hoje.getDate() + 1
+  }, [ehMesAtual])
+  const valorDisponivelPorDia =
+    diasRestantesMes && dinheiroDisponivel > 0 ? dinheiroDisponivel / diasRestantesMes : null
   const totalEmContas = useMemo(
     () => calcularTotalEmContas(contas, dadosSaldo),
     [contas, despesas, entradas, movimentacoes]
@@ -244,7 +254,11 @@ export function Dashboard() {
           nota={
             !contaAutomatica
               ? 'Crie uma conta do tipo Automática em Contas pra este número funcionar'
-              : undefined
+              : valorDisponivelPorDia !== null
+                ? `${formatCurrency(valorDisponivelPorDia)}/dia até o fim do mês (${diasRestantesMes}d)`
+                : ehMesAtual && dinheiroDisponivel <= 0
+                  ? 'Sem saldo disponível pro resto do mês'
+                  : undefined
           }
         />
         <CardIndicador
