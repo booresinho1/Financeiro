@@ -42,14 +42,6 @@ export function Dividas() {
   const [mesInicial, setMesInicial] = useState(periodoAtual())
   const [mesFinal, setMesFinal] = useState(somarMeses(`${periodoAtual()}-01`, 5).slice(0, 7))
 
-  const categorias = useMemo(
-    () => Array.from(new Set(despesas.map((d) => d.categoria))).sort(),
-    [despesas]
-  )
-  const subcategorias = useMemo(
-    () => Array.from(new Set(despesas.map((d) => d.subcategoria))).sort(),
-    [despesas]
-  )
 
   const resumoGeral = useMemo(() => {
     let totalRestante = 0
@@ -264,8 +256,6 @@ export function Dividas() {
 
       {modalDividaAberto && (
         <DividaFormModal
-          categorias={categorias}
-          subcategorias={subcategorias}
           onClose={() => setModalDividaAberto(false)}
           onSubmit={handleCriarDivida}
         />

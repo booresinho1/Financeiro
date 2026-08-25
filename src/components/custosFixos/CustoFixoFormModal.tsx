@@ -1,13 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { Modal } from '@/components/ui/Modal'
-import { ComboBox } from '@/components/ui/ComboBox'
+import { SeletorCategoria } from '@/components/shared/SeletorCategoria'
+import { SeletorSubcategoria } from '@/components/shared/SeletorSubcategoria'
 import type { CustoFixo } from '@/types/finance'
 import type { NovoCustoFixo } from '@/repositories/custosFixosRepository'
 
 interface CustoFixoFormModalProps {
   custoFixo?: CustoFixo
-  categorias: string[]
-  subcategorias: string[]
   onClose: () => void
   onSubmit: (dados: NovoCustoFixo) => Promise<void>
 }
@@ -18,8 +17,6 @@ function hoje() {
 
 export function CustoFixoFormModal({
   custoFixo,
-  categorias,
-  subcategorias,
   onClose,
   onSubmit,
 }: CustoFixoFormModalProps) {
@@ -119,15 +116,15 @@ export function CustoFixoFormModal({
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-ink-soft mb-1">Categoria</label>
-          <ComboBox value={categoria} onChange={setCategoria} opcoes={categorias} required />
-        </div>
+        <SeletorCategoria
+          value={categoria}
+          onChange={(nome) => {
+            setCategoria(nome)
+            setSubcategoria('')
+          }}
+        />
 
-        <div>
-          <label className="block text-sm font-medium text-ink-soft mb-1">Subcategoria</label>
-          <ComboBox value={subcategoria} onChange={setSubcategoria} opcoes={subcategorias} required />
-        </div>
+        <SeletorSubcategoria value={subcategoria} onChange={setSubcategoria} nomeCategoria={categoria} />
 
         <div>
           <label className="block text-sm font-medium text-ink-soft mb-1">

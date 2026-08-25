@@ -1,12 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { ComboBox } from '@/components/ui/ComboBox'
+import { SeletorCategoria } from '@/components/shared/SeletorCategoria'
 import type { Entrada, StatusEntrada } from '@/types/finance'
 import type { NovaEntrada } from '@/repositories/entradasRepository'
 
 interface EntradaFormModalProps {
   entrada?: Entrada
-  categorias: string[]
   contas: string[]
   onClose: () => void
   onSubmit: (dados: NovaEntrada) => Promise<void>
@@ -18,7 +18,6 @@ function hoje() {
 
 export function EntradaFormModal({
   entrada,
-  categorias,
   contas,
   onClose,
   onSubmit,
@@ -132,10 +131,7 @@ export function EntradaFormModal({
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-ink-soft mb-1">Categoria</label>
-          <ComboBox value={categoria} onChange={setCategoria} opcoes={categorias} required />
-        </div>
+        <SeletorCategoria value={categoria} onChange={setCategoria} />
 
         <div>
           <label className="block text-sm font-medium text-ink-soft mb-1">Conta de destino</label>

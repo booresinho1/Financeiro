@@ -1,21 +1,18 @@
 import { useState, type FormEvent } from 'react'
 import { Modal } from '@/components/ui/Modal'
-import { ComboBox } from '@/components/ui/ComboBox'
+import { SeletorCategoria } from '@/components/shared/SeletorCategoria'
+import { SeletorSubcategoria } from '@/components/shared/SeletorSubcategoria'
 import type { Orcamento } from '@/types/finance'
 import type { NovoOrcamento } from '@/repositories/orcamentosRepository'
 
 interface OrcamentoFormModalProps {
   orcamento?: Orcamento
-  categorias: string[]
-  subcategorias: string[]
   onClose: () => void
   onSubmit: (dados: NovoOrcamento) => Promise<void>
 }
 
 export function OrcamentoFormModal({
   orcamento,
-  categorias,
-  subcategorias,
   onClose,
   onSubmit,
 }: OrcamentoFormModalProps) {
@@ -53,21 +50,22 @@ export function OrcamentoFormModal({
   return (
     <Modal title={orcamento ? 'Editar orçamento' : 'Novo orçamento'} onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-3">
-        <div>
-          <label className="block text-sm font-medium text-ink-soft mb-1">Categoria</label>
-          <ComboBox value={categoria} onChange={setCategoria} opcoes={categorias} required />
-        </div>
+        <SeletorCategoria
+          value={categoria}
+          onChange={(nome) => {
+            setCategoria(nome)
+            setSubcategoria('')
+          }}
+        />
 
         <div>
-          <label className="block text-sm font-medium text-ink-soft mb-1">
-            Subcategoria <span className="text-ink-faint font-normal">(opcional)</span>
-          </label>
-          <ComboBox
+          <SeletorSubcategoria
             value={subcategoria}
             onChange={setSubcategoria}
-            opcoes={subcategorias}
-            placeholder="Deixe em branco para orçar a categoria inteira"
+            nomeCategoria={categoria}
+            required={false}
           />
+          <p className="text-xs text-ink-faint mt-1">Deixe em "Nenhuma" para orçar a categoria inteira.</p>
         </div>
 
         <div>

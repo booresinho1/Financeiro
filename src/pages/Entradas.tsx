@@ -44,11 +44,6 @@ export function Entradas() {
     return Array.from(conjunto).sort().reverse()
   }, [entradas])
 
-  const categorias = useMemo(
-    () => Array.from(new Set(entradas.map((e) => e.categoria))).sort(),
-    [entradas]
-  )
-
   const nomesContas = useMemo(() => {
     const dasContasCadastradas = contas.filter((c) => c.ativa).map((c) => c.nome)
     const dasEntradas = entradas.map((e) => e.contaDestino)
@@ -321,7 +316,6 @@ export function Entradas() {
       {modalAberto && (
         <EntradaFormModal
           entrada={entradaEditando}
-          categorias={categorias}
           contas={nomesContas.length ? nomesContas : ['Conta Total']}
           onClose={() => setModalAberto(false)}
           onSubmit={handleSubmit}

@@ -1,11 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Modal } from '@/components/ui/Modal'
-import { ComboBox } from '@/components/ui/ComboBox'
+import { SeletorCategoria } from '@/components/shared/SeletorCategoria'
+import { SeletorSubcategoria } from '@/components/shared/SeletorSubcategoria'
 import type { NovaDivida } from '@/repositories/dividasRepository'
 
 interface DividaFormModalProps {
-  categorias: string[]
-  subcategorias: string[]
   onClose: () => void
   onSubmit: (dados: NovaDivida) => Promise<void>
 }
@@ -14,12 +13,7 @@ function hoje() {
   return new Date().toISOString().slice(0, 10)
 }
 
-export function DividaFormModal({
-  categorias,
-  subcategorias,
-  onClose,
-  onSubmit,
-}: DividaFormModalProps) {
+export function DividaFormModal({ onClose, onSubmit }: DividaFormModalProps) {
   const [descricao, setDescricao] = useState('')
   const [valorTotal, setValorTotal] = useState('')
   const [numParcelas, setNumParcelas] = useState('1')
@@ -153,18 +147,20 @@ export function DividaFormModal({
         </div>
 
         <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="block text-sm font-medium text-ink-soft mb-1">
-              Categoria <span className="text-ink-faint font-normal">(opcional)</span>
-            </label>
-            <ComboBox value={categoria} onChange={setCategoria} opcoes={categorias} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-ink-soft mb-1">
-              Subcategoria <span className="text-ink-faint font-normal">(opcional)</span>
-            </label>
-            <ComboBox value={subcategoria} onChange={setSubcategoria} opcoes={subcategorias} />
-          </div>
+          <SeletorCategoria
+            value={categoria}
+            onChange={(nome) => {
+              setCategoria(nome)
+              setSubcategoria('')
+            }}
+            required={false}
+          />
+          <SeletorSubcategoria
+            value={subcategoria}
+            onChange={setSubcategoria}
+            nomeCategoria={categoria}
+            required={false}
+          />
         </div>
 
         <div>

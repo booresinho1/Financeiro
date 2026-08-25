@@ -43,14 +43,6 @@ export function CustosFixos() {
     return Array.from(conjunto).sort().reverse()
   }, [despesas])
 
-  const categorias = useMemo(
-    () => Array.from(new Set(despesas.map((d) => d.categoria))).sort(),
-    [despesas]
-  )
-  const subcategorias = useMemo(
-    () => Array.from(new Set(despesas.map((d) => d.subcategoria))).sort(),
-    [despesas]
-  )
 
   const despesasDoPeriodo = useMemo(
     () => despesas.filter((d) => d.data.slice(0, 7) === periodo),
@@ -234,8 +226,6 @@ export function CustosFixos() {
       {modalAberto && (
         <CustoFixoFormModal
           custoFixo={editando}
-          categorias={categorias}
-          subcategorias={subcategorias}
           onClose={() => setModalAberto(false)}
           onSubmit={handleSubmit}
         />

@@ -7,9 +7,15 @@ interface SeletorCategoriaProps {
   value: string
   onChange: (nomeCategoria: string) => void
   label?: string
+  required?: boolean
 }
 
-export function SeletorCategoria({ value, onChange, label = 'Categoria' }: SeletorCategoriaProps) {
+export function SeletorCategoria({
+  value,
+  onChange,
+  label = 'Categoria',
+  required = true,
+}: SeletorCategoriaProps) {
   const { categorias, criar } = useCategorias()
   const [modalAberto, setModalAberto] = useState(false)
 
@@ -21,16 +27,18 @@ export function SeletorCategoria({ value, onChange, label = 'Categoria' }: Selet
 
   return (
     <div>
-      <label className="block text-sm font-medium text-ink-soft mb-1">{label}</label>
+      <label className="block text-sm font-medium text-ink-soft mb-1">
+        {label} {!required && <span className="text-ink-faint font-normal">(opcional)</span>}
+      </label>
       <div className="flex gap-2">
         <select
           value={value}
           onChange={(e) => onChange(e.target.value)}
           className="w-full rounded-xl border border-line px-3.5 py-2.5 text-sm bg-surface"
-          required
+          required={required}
         >
-          <option value="" disabled>
-            Selecione...
+          <option value="" disabled={required}>
+            {required ? 'Selecione...' : 'Nenhuma'}
           </option>
           {opcoesComValorAtual
             .sort((a, b) => a.nome.localeCompare(b.nome))
