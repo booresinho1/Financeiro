@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   Wallet,
   TrendingUp,
@@ -11,6 +11,7 @@ import {
   Target,
   ChevronLeft,
   ChevronRight,
+  X,
 } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { EntradasDespesasChart } from '@/components/dashboard/EntradasDespesasChart'
@@ -25,7 +26,7 @@ import { usePagamentosCustosFixos } from '@/hooks/usePagamentosCustosFixos'
 import { useParcelas } from '@/hooks/useParcelas'
 import { useMetas } from '@/hooks/useMetas'
 import { calcularSaldo, calcularTotalEmContas } from '@/lib/saldos'
-import { formatCurrency } from '@/lib/format'
+import { formatCurrency, formatDate } from '@/lib/format'
 import { somarMeses } from '@/lib/datas'
 
 const MESES = [
@@ -102,6 +103,11 @@ export function Dashboard() {
   const [mesFinalComprometido, setMesFinalComprometido] = useState(
     somarMeses(`${periodoAtual()}-01`, 2).slice(0, 7)
   )
+  const [categoriaSelecionada, setCategoriaSelecionada] = useState<string | null>(null)
+
+  useEffect(() => {
+    setCategoriaSelecionada(null)
+  }, [periodo])
 
   const dadosSaldo = { despesas, entradas, movimentacoes }
 
@@ -129,6 +135,13 @@ export function Dashboard() {
   const despesasFiltradas = useMemo(
     () => despesas.filter((d) => d.data.slice(0, 7) === periodo),
     [despesas, periodo]
+  )
+  const despesasDaTabela = useMemo(
+    () =>
+      [...despesasFiltradas]
+        .filter((d) => !categoriaSelecionada || d.categoria === categoriaSelecionada)
+        .sort((a, b) => b.data.localeCompare(a.data)),
+    [despesasFiltradas, categoriaSelecionada]
   )
   const despesasDoPeriodo = useMemo(
     () => despesasFiltradas.reduce((s, d) => s + d.valor, 0),
@@ -340,8 +353,60 @@ export function Dashboard() {
       <div className="mt-3">
         <CardBase eyebrow={`Despesas por categoria — ${labelPeriodo(periodo)}`}>
           <div className="mt-2">
-            <DespesasPorCategoriaChart despesas={despesasFiltradas} />
+            <DespesasPorCategoriaChart
+              despesas={despesasFiltradas}
+              categoriaSelecionada={categoriaSelecionada}
+              onCategoriaClick={(cat) =>
+                setCategoriaSelecionada((atual) => (atual === cat ? null : cat))
+              }
+            />
           </div>
+
+          <div className="flex items-center justify-between mt-5 mb-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+              Últimos gastos
+            </span>
+            {categoriaSelecionada && (
+              <button
+                onClick={() => setCategoriaSelecionada(null)}
+                className="flex items-center gap-1 rounded-full bg-brand-soft px-2.5 py-1 text-xs font-medium text-brand"
+              >
+                {categoriaSelecionada}
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+
+          {despesasDaTabela.length === 0 ? (
+            <p className="text-sm text-ink-faint py-6 text-center">Nenhuma despesa encontrada.</p>
+          ) : (
+            <div className="max-h-72 overflow-y-auto rounded-xl border border-line-soft">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-surface-2">
+                  <tr className="text-left text-ink-faint">
+                    <th className="px-3 py-2 font-medium">Data</th>
+                    <th className="px-3 py-2 font-medium">Descrição</th>
+                    <th className="px-3 py-2 font-medium">Categoria</th>
+                    <th className="px-3 py-2 font-medium text-right">Valor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {despesasDaTabela.map((d) => (
+                    <tr key={d.id} className="border-t border-line-soft">
+                      <td className="px-3 py-2 whitespace-nowrap text-ink-soft">
+                        {formatDate(d.data)}
+                      </td>
+                      <td className="px-3 py-2 text-ink truncate max-w-[160px]">{d.descricao}</td>
+                      <td className="px-3 py-2 text-ink-muted whitespace-nowrap">{d.categoria}</td>
+                      <td className="px-3 py-2 text-right font-medium text-ink whitespace-nowrap">
+                        {formatCurrency(d.valor)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardBase>
       </div>
 

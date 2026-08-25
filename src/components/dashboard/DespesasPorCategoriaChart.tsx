@@ -3,6 +3,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   LabelList,
   ResponsiveContainer,
   Tooltip,
@@ -15,6 +16,8 @@ import { useChartColors } from '@/lib/chartTheme'
 
 interface DespesasPorCategoriaChartProps {
   despesas: Despesa[]
+  categoriaSelecionada?: string | null
+  onCategoriaClick?: (categoria: string) => void
 }
 
 interface TooltipProps {
@@ -33,7 +36,11 @@ function TooltipConteudo({ active, payload }: TooltipProps) {
   )
 }
 
-export function DespesasPorCategoriaChart({ despesas }: DespesasPorCategoriaChartProps) {
+export function DespesasPorCategoriaChart({
+  despesas,
+  categoriaSelecionada,
+  onCategoriaClick,
+}: DespesasPorCategoriaChartProps) {
   const { grid: GRID, inkMuted: INK_MUTED, inkPrimary: INK_PRIMARY, expense: COR_DESPESA, cursorFill } = useChartColors()
   const dados = useMemo(() => {
     const porCategoria = new Map<string, number>()
@@ -75,7 +82,22 @@ export function DespesasPorCategoriaChart({ despesas }: DespesasPorCategoriaChar
           tickLine={false}
         />
         <Tooltip content={<TooltipConteudo />} cursor={{ fill: cursorFill }} />
-        <Bar dataKey="valor" fill={COR_DESPESA} radius={[0, 4, 4, 0]} maxBarSize={22}>
+        <Bar
+          dataKey="valor"
+          radius={[0, 4, 4, 0]}
+          maxBarSize={22}
+          onClick={(data) => onCategoriaClick?.((data as unknown as { payload: { categoria: string } }).payload.categoria)}
+          style={{ cursor: onCategoriaClick ? 'pointer' : undefined }}
+        >
+          {dados.map((d) => (
+            <Cell
+              key={d.categoria}
+              fill={COR_DESPESA}
+              fillOpacity={
+                !categoriaSelecionada || categoriaSelecionada === d.categoria ? 1 : 0.3
+              }
+            />
+          ))}
           <LabelList
             dataKey="valor"
             position="right"
