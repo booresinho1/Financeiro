@@ -1,16 +1,21 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { MoreHorizontal, X, LogOut } from 'lucide-react'
+import { MoreHorizontal, X, LogOut, Plus } from 'lucide-react'
 import { mobilePrimaryNavItems, navItems, EMAIL_MASTER } from '@/lib/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 
-export function BottomNav() {
+interface BottomNavProps {
+  onNovaDespesa: () => void
+}
+
+export function BottomNav({ onNovaDespesa }: BottomNavProps) {
   const [moreOpen, setMoreOpen] = useState(false)
   const { user, sair } = useAuth()
   const overflowItems = navItems.filter(
     (item) =>
       !mobilePrimaryNavItems.includes(item) && (!item.masterOnly || user?.email === EMAIL_MASTER)
   )
+  const [antes, depois] = [mobilePrimaryNavItems.slice(0, 2), mobilePrimaryNavItems.slice(2)]
 
   return (
     <>
@@ -65,7 +70,7 @@ export function BottomNav() {
 
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]">
         <div className="grid grid-cols-5">
-          {mobilePrimaryNavItems.map(({ to, label, icon: Icon }) => (
+          {antes.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -81,6 +86,34 @@ export function BottomNav() {
               {label}
             </NavLink>
           ))}
+
+          <div className="flex items-center justify-center">
+            <button
+              onClick={onNovaDespesa}
+              aria-label="Nova despesa"
+              className="relative -top-4 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-white shadow-lg shadow-black/40 ring-4 ring-app hover:bg-brand-hover"
+            >
+              <Plus className="h-6 w-6" strokeWidth={2.4} />
+            </button>
+          </div>
+
+          {depois.map(({ to, label, icon: Icon }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === '/'}
+              className={({ isActive }) =>
+                [
+                  'flex flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-medium',
+                  isActive ? 'text-brand' : 'text-ink-muted',
+                ].join(' ')
+              }
+            >
+              <Icon className="h-5 w-5" />
+              {label}
+            </NavLink>
+          ))}
+
           <button
             onClick={() => setMoreOpen(true)}
             className="flex flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-medium text-ink-muted"

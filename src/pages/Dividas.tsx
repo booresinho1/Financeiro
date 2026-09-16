@@ -41,7 +41,7 @@ export function Dividas() {
     excluir: excluirParcela,
     recarregar: recarregarParcelas,
   } = useParcelas()
-  const { despesas } = useDespesas()
+  const { despesas, criar: criarDespesa } = useDespesas()
 
   const [modalDividaAberto, setModalDividaAberto] = useState(false)
   const [dividaEditando, setDividaEditando] = useState<Divida | undefined>()
@@ -87,9 +87,13 @@ export function Dividas() {
 
     if (!confirm(aviso)) return
 
-    await excluir(divida.id)
-    for (const parcela of parcelasDaDivida) {
-      await excluirParcela(parcela.id)
+    try {
+      for (const parcela of parcelasDaDivida) {
+        await excluirParcela(parcela.id)
+      }
+      await excluir(divida.id)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Erro ao excluir dívida')
     }
   }
 
@@ -100,7 +104,23 @@ export function Dividas() {
 
   async function handleConfirmarPagamento(dados: Parameters<typeof atualizarParcela>[1]) {
     if (!parcelaPagando) return
-    await atualizarParcela(parcelaPagando.id, dados)
+
+    let idDespesa = dados.idDespesa
+    if (!idDespesa) {
+      const divida = dividas.find((d) => d.id === parcelaPagando.idDivida)
+      const despesaCriada = await criarDespesa({
+        data: dados.dataPagamento ?? parcelaPagando.dataVencimento,
+        descricao: divida
+          ? `Parcela ${parcelaPagando.numeroParcela}/${divida.numParcelas} - ${divida.descricao}`
+          : `Parcela ${parcelaPagando.numeroParcela}`,
+        valor: dados.valorPago ?? parcelaPagando.valorPrevisto,
+        categoria: divida?.categoria || 'DÍVIDAS/FIXOS',
+        subcategoria: divida?.subcategoria || 'Parcelas',
+      })
+      idDespesa = despesaCriada.id
+    }
+
+    await atualizarParcela(parcelaPagando.id, { ...dados, idDespesa })
   }
 
   return (

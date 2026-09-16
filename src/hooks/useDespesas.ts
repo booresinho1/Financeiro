@@ -27,6 +27,7 @@ export function useDespesas() {
   const criar = useCallback(async (dados: NovaDespesa) => {
     const criada = await despesasRepository.criar(dados)
     setDespesas((atual) => [criada, ...atual])
+    return criada
   }, [])
 
   const atualizar = useCallback(async (id: string, dados: NovaDespesa) => {

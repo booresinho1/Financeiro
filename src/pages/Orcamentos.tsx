@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Plus, PiggyBank, Pencil, Trash2 } from 'lucide-react'
+import { Plus, PiggyBank, Pencil, Trash2, Wallet, Receipt, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { OrcamentoFormModal } from '@/components/orcamentos/OrcamentoFormModal'
@@ -90,13 +90,12 @@ export function Orcamentos() {
     await excluir(orcamento.id)
   }
 
+  const estourou = resumo.disponivel < 0
+
   return (
     <>
       <PageHeader
         title="Orçamentos"
-        subtitle={`Orçado: ${formatCurrency(resumo.orcado)} · Realizado: ${formatCurrency(
-          resumo.realizado
-        )} · Disponível: ${formatCurrency(resumo.disponivel)}`}
         action={
           <button
             onClick={abrirNovo}
@@ -108,11 +107,11 @@ export function Orcamentos() {
         }
       />
 
-      <div className="mb-4">
+      <div className="flex justify-end mb-3">
         <select
           value={periodo}
           onChange={(e) => setPeriodo(e.target.value)}
-          className="rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm shadow-sm shadow-slate-900/[0.02]"
+          className="rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm shadow-sm shadow-black/20"
         >
           {periodosDisponiveis.map((p) => (
             <option key={p} value={p}>
@@ -120,6 +119,75 @@ export function Orcamentos() {
             </option>
           ))}
         </select>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+        <div className="rounded-2xl border border-line bg-surface shadow-lg shadow-black/30 overflow-hidden">
+          <div className="h-1 bg-gradient-to-r from-ink-faint to-ink-faint/0" />
+          <div className="p-5 flex items-center gap-3.5">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-surface-2 ring-1 ring-inset ring-white/5">
+              <Wallet className="h-5 w-5 text-ink-muted" strokeWidth={2.1} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-ink-muted">Orçado</p>
+              <p className="text-2xl font-bold text-ink mt-0.5 tracking-tight truncate">
+                {formatCurrency(resumo.orcado)}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-line bg-surface shadow-lg shadow-brand/[0.12] overflow-hidden">
+          <div className="h-1 bg-gradient-to-r from-brand to-brand/0" />
+          <div className="p-5 flex items-center gap-3.5">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-soft ring-1 ring-inset ring-white/5">
+              <Receipt className="h-5 w-5 text-brand" strokeWidth={2.1} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-ink-muted">Realizado</p>
+              <p className="text-2xl font-bold text-ink mt-0.5 tracking-tight truncate">
+                {formatCurrency(resumo.realizado)}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div
+          className={`rounded-2xl border border-line bg-surface shadow-lg overflow-hidden ${
+            estourou ? 'shadow-expense/[0.15]' : 'shadow-income/[0.15]'
+          }`}
+        >
+          <div
+            className={`h-1 bg-gradient-to-r ${
+              estourou ? 'from-expense to-expense/0' : 'from-income to-income/0'
+            }`}
+          />
+          <div className="p-5 flex items-center gap-3.5">
+            <span
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ring-1 ring-inset ring-white/5 ${
+                estourou ? 'bg-expense-soft' : 'bg-income-soft'
+              }`}
+            >
+              {estourou ? (
+                <AlertTriangle className="h-5 w-5 text-expense" strokeWidth={2.1} />
+              ) : (
+                <CheckCircle2 className="h-5 w-5 text-income" strokeWidth={2.1} />
+              )}
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-ink-muted">
+                {estourou ? 'Acima do orçamento' : 'Disponível'}
+              </p>
+              <p
+                className={`text-2xl font-bold mt-0.5 tracking-tight truncate ${
+                  estourou ? 'text-expense' : 'text-ink'
+                }`}
+              >
+                {formatCurrency(Math.abs(resumo.disponivel))}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {erro && (

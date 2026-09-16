@@ -45,25 +45,52 @@ function labelPeriodo(periodo: string): string {
   return `${MESES[Number(mes) - 1]}/${ano}`
 }
 
+function splitMoeda(valorFormatado: string): [string, string] {
+  const idx = valorFormatado.lastIndexOf(',')
+  if (idx === -1) return [valorFormatado, '']
+  return [valorFormatado.slice(0, idx), valorFormatado.slice(idx + 1)]
+}
+
+type CorAccent = 'income' | 'expense' | 'neutral'
+
+const ACCENT_GRADIENT: Record<CorAccent, string> = {
+  income: 'from-income to-income/0',
+  expense: 'from-expense to-expense/0',
+  neutral: 'from-ink-faint to-ink-faint/0',
+}
+const ACCENT_GLOW: Record<CorAccent, string> = {
+  income: 'shadow-income/[0.15]',
+  expense: 'shadow-expense/[0.15]',
+  neutral: 'shadow-black/30',
+}
+
 interface CardIndicadorProps {
   titulo: string
   valor: string
   icone: typeof Wallet
   cor: string
   corFundo: string
+  accent: CorAccent
   nota?: string
 }
 
-function CardIndicador({ titulo, valor, icone: Icone, cor, corFundo, nota }: CardIndicadorProps) {
+function CardIndicador({ titulo, valor, icone: Icone, cor, corFundo, accent, nota }: CardIndicadorProps) {
   return (
-    <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm shadow-slate-900/[0.02] flex items-center gap-3">
-      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${corFundo}`}>
-        <Icone className={`h-[18px] w-[18px] ${cor}`} strokeWidth={2.1} />
-      </span>
-      <div className="min-w-0">
-        <p className="text-xs font-medium text-ink-muted">{titulo}</p>
-        <p className="text-2xl font-bold text-ink mt-0.5 tracking-tight truncate">{valor}</p>
-        {nota && <p className="text-[11px] text-ink-faint mt-0.5 truncate">{nota}</p>}
+    <div
+      className={`rounded-2xl border border-line bg-surface shadow-lg ${ACCENT_GLOW[accent]} overflow-hidden transition-transform hover:-translate-y-0.5`}
+    >
+      <div className={`h-1 bg-gradient-to-r ${ACCENT_GRADIENT[accent]}`} />
+      <div className="p-5 flex items-center gap-3.5">
+        <span
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ring-1 ring-inset ring-white/5 ${corFundo}`}
+        >
+          <Icone className={`h-5 w-5 ${cor}`} strokeWidth={2.1} />
+        </span>
+        <div className="min-w-0">
+          <p className="text-xs font-medium text-ink-muted">{titulo}</p>
+          <p className="text-2xl font-bold text-ink mt-0.5 tracking-tight truncate">{valor}</p>
+          {nota && <p className="text-[11px] text-ink-faint mt-0.5 truncate">{nota}</p>}
+        </div>
       </div>
     </div>
   )
@@ -73,19 +100,24 @@ function CardBase({
   eyebrow,
   children,
   className = '',
+  accent,
 }: {
   eyebrow: string
   children: ReactNode
   className?: string
+  accent?: CorAccent
 }) {
   return (
     <div
-      className={`rounded-2xl border border-line bg-surface p-5 shadow-sm shadow-slate-900/[0.02] ${className}`}
+      className={`rounded-2xl border border-line bg-surface shadow-lg ${accent ? ACCENT_GLOW[accent] : 'shadow-black/30'} overflow-hidden ${className}`}
     >
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
-        {eyebrow}
-      </span>
-      {children}
+      {accent && <div className={`h-1 bg-gradient-to-r ${ACCENT_GRADIENT[accent]}`} />}
+      <div className="p-5">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+          {eyebrow}
+        </span>
+        {children}
+      </div>
     </div>
   )
 }
@@ -245,98 +277,158 @@ export function Dashboard() {
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <CardIndicador
-          titulo="Dinheiro disponível"
-          valor={formatCurrency(dinheiroDisponivel)}
-          icone={Wallet}
-          cor="text-income"
-          corFundo="bg-income-soft"
-          nota={
-            !contaAutomatica
-              ? 'Crie uma conta do tipo Automática em Contas pra este número funcionar'
-              : valorDisponivelPorDia !== null
-                ? `${formatCurrency(valorDisponivelPorDia)}/dia até o fim do mês (${diasRestantesMes}d)`
-                : ehMesAtual && dinheiroDisponivel <= 0
-                  ? 'Sem saldo disponível pro resto do mês'
-                  : undefined
-          }
-        />
-        <CardIndicador
-          titulo="Total em contas"
-          valor={formatCurrency(totalEmContas)}
-          icone={Scale}
-          cor="text-ink-muted"
-          corFundo="bg-surface-2"
-        />
-        <CardIndicador
-          titulo="Entradas do período"
-          valor={formatCurrency(entradasDoPeriodo)}
-          icone={ArrowDownToLine}
-          cor="text-income"
-          corFundo="bg-income-soft"
-          nota={
-            entradasPrevistasDoPeriodo > 0
-              ? `+ ${formatCurrency(entradasPrevistasDoPeriodo)} previstas`
-              : undefined
-          }
-        />
-        <CardIndicador
-          titulo="Despesas do período"
-          valor={formatCurrency(despesasDoPeriodo)}
-          icone={Receipt}
-          cor="text-expense"
-          corFundo="bg-expense-soft"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
-        <CardBase eyebrow="Resultado do período">
-          <div className="flex items-center gap-2 mt-2">
-            {resultado >= 0 ? (
-              <TrendingUp className="h-4 w-4 text-income" />
-            ) : (
-              <TrendingDown className="h-4 w-4 text-expense" />
+      <div className="lg:grid lg:grid-cols-[360px_1fr] lg:gap-4 lg:items-start">
+        <div className="space-y-3">
+          <div className="rounded-2xl border border-line bg-gradient-to-br from-brand-soft/50 via-surface to-surface p-7 shadow-xl shadow-brand/[0.08]">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+              Dinheiro disponível
+            </p>
+            <p className="text-[3.75rem] leading-[0.95] font-extrabold text-ink tracking-tighter mt-3 truncate">
+              {(() => {
+                const [inteiro, centavos] = splitMoeda(formatCurrency(dinheiroDisponivel))
+                return (
+                  <>
+                    {inteiro}
+                    {centavos && <span className="text-ink-faint text-[2.5rem]">,{centavos}</span>}
+                  </>
+                )
+              })()}
+            </p>
+            {ehMesAtual && diasRestantesMes && (
+              <div className="h-1.5 rounded-full bg-surface-2 mt-5 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-brand to-income"
+                  style={{
+                    width: `${Math.min(100, ((30 - diasRestantesMes + 1) / 30) * 100)}%`,
+                  }}
+                />
+              </div>
             )}
-            <p
-              className={`text-2xl font-bold tracking-tight ${
-                resultado >= 0 ? 'text-income' : 'text-expense'
-              }`}
-            >
-              {resultado >= 0 ? '+' : ''}
-              {formatCurrency(resultado)}
+            <p className="text-xs text-ink-muted mt-2.5">
+              {!contaAutomatica
+                ? 'Crie uma conta do tipo Automática em Contas pra este número funcionar'
+                : valorDisponivelPorDia !== null
+                  ? `${formatCurrency(valorDisponivelPorDia)}/dia até o fim do mês · ${diasRestantesMes} dias restam`
+                  : ehMesAtual && dinheiroDisponivel <= 0
+                    ? 'Sem saldo disponível pro resto do mês'
+                    : 'Saldo total da conta automática'}
             </p>
           </div>
-        </CardBase>
 
-        <CardBase eyebrow="Compromissos futuros" className="sm:col-span-2">
-          <div className="grid grid-cols-3 gap-2 mt-3">
-            <div>
-              <div className="flex items-center gap-1.5 text-ink-faint">
-                <Repeat className="h-3.5 w-3.5" />
-                <span className="text-xs">Custos fixos</span>
+          {contas.filter((c) => c.ativa).length > 0 && (
+            <div className="rounded-2xl border border-line bg-surface p-4 shadow-lg shadow-black/30">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
+                Contas
+              </span>
+              <div className="mt-2">
+                {contas
+                  .filter((c) => c.ativa)
+                  .map((c) => (
+                    <div key={c.id} className="flex items-center gap-2.5 py-1.5">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[11px] font-bold text-brand">
+                        {c.nome[0]?.toUpperCase()}
+                      </span>
+                      <p className="text-sm text-ink-soft truncate flex-1 min-w-0">{c.nome}</p>
+                      <p className="text-sm font-semibold text-ink shrink-0">
+                        {formatCurrency(calcularSaldo(c, dadosSaldo))}
+                      </p>
+                    </div>
+                  ))}
               </div>
-              <p className="text-lg font-bold text-ink mt-0.5">
-                {formatCurrency(custosFixosDoPeriodo)}
-              </p>
             </div>
-            <div>
-              <div className="flex items-center gap-1.5 text-ink-faint">
-                <CreditCard className="h-3.5 w-3.5" />
-                <span className="text-xs">Parcelas</span>
-              </div>
-              <p className="text-lg font-bold text-ink mt-0.5">
-                {formatCurrency(parcelasDoPeriodo)}
-              </p>
-            </div>
-            <div>
-              <span className="text-xs text-ink-faint">Total comprometido</span>
-              <p className="text-lg font-bold text-ink mt-0.5">
-                {formatCurrency(totalComprometido)}
-              </p>
-            </div>
+          )}
+        </div>
+
+        <div className="space-y-3 mt-3 lg:mt-0">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <CardIndicador
+              titulo="Total em contas"
+              valor={formatCurrency(totalEmContas)}
+              icone={Scale}
+              cor="text-ink-muted"
+              corFundo="bg-surface-2"
+              accent="neutral"
+            />
+            <CardIndicador
+              titulo="Entradas do período"
+              valor={formatCurrency(entradasDoPeriodo)}
+              icone={ArrowDownToLine}
+              cor="text-income"
+              corFundo="bg-income-soft"
+              accent="income"
+              nota={
+                entradasPrevistasDoPeriodo > 0
+                  ? `+ ${formatCurrency(entradasPrevistasDoPeriodo)} previstas`
+                  : undefined
+              }
+            />
+            <CardIndicador
+              titulo="Despesas do período"
+              valor={formatCurrency(despesasDoPeriodo)}
+              icone={Receipt}
+              cor="text-expense"
+              corFundo="bg-expense-soft"
+              accent="expense"
+            />
           </div>
-        </CardBase>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <CardBase eyebrow="Resultado do período" accent={resultado >= 0 ? 'income' : 'expense'}>
+              <div className="flex items-center gap-2 mt-2">
+                {resultado >= 0 ? (
+                  <TrendingUp className="h-4 w-4 text-income" />
+                ) : (
+                  <TrendingDown className="h-4 w-4 text-expense" />
+                )}
+                <p
+                  className={`text-2xl font-bold tracking-tight ${
+                    resultado >= 0 ? 'text-income' : 'text-expense'
+                  }`}
+                >
+                  {resultado >= 0 ? '+' : ''}
+                  {formatCurrency(resultado)}
+                </p>
+              </div>
+            </CardBase>
+
+            <CardBase eyebrow="Compromissos futuros" className="sm:col-span-2">
+              <div className="grid grid-cols-3 gap-4 mt-4">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-2 ring-1 ring-inset ring-white/5">
+                    <Repeat className="h-[18px] w-[18px] text-ink-muted" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[11px] text-ink-faint truncate">Custos fixos</p>
+                    <p className="text-lg font-bold text-ink truncate">
+                      {formatCurrency(custosFixosDoPeriodo)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 border-l border-line-soft pl-4">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-2 ring-1 ring-inset ring-white/5">
+                    <CreditCard className="h-[18px] w-[18px] text-ink-muted" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[11px] text-ink-faint truncate">Parcelas</p>
+                    <p className="text-lg font-bold text-ink truncate">
+                      {formatCurrency(parcelasDoPeriodo)}
+                    </p>
+                  </div>
+                </div>
+                <div className="border-l border-line-soft pl-4">
+                  <p className="text-[11px] text-ink-faint truncate">Total comprometido</p>
+                  <p className="text-lg font-bold text-brand truncate">
+                    {formatCurrency(totalComprometido)}
+                  </p>
+                </div>
+              </div>
+            </CardBase>
+          </div>
+
+          <CardBase eyebrow="Entradas vs. despesas">
+            <EntradasDespesasChart entradas={entradas} despesas={despesas} periodo={periodo} meses={4} />
+          </CardBase>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm shadow-slate-900/[0.02] mt-3">
@@ -373,12 +465,6 @@ export function Dashboard() {
           mesInicial={mesInicialComprometido}
           mesFinal={mesFinalComprometido}
         />
-      </div>
-
-      <div className="mt-3">
-        <CardBase eyebrow="Entradas vs. despesas">
-          <EntradasDespesasChart entradas={entradas} despesas={despesas} periodo={periodo} />
-        </CardBase>
       </div>
 
       <div className="mt-3">
