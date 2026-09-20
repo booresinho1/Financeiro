@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Plus, CreditCard, ChevronDown, Ban, Check, Pencil } from 'lucide-react'
+import { Plus, CreditCard, ChevronDown, Ban, Check, Pencil, Wallet, CalendarCheck2 } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { DividaFormModal } from '@/components/dividas/DividaFormModal'
@@ -53,11 +53,35 @@ export function Dividas() {
 
   const resumoGeral = useMemo(() => {
     let totalRestante = 0
+    let previsaoTermino: string | null = null
     for (const d of dividas) {
-      totalRestante += calcularResumoDivida(d, parcelas).totalRestante
+      const resumo = calcularResumoDivida(d, parcelas)
+      totalRestante += resumo.totalRestante
+      if (
+        resumo.parcelasRestantes > 0 &&
+        resumo.dataPrevistaTermino &&
+        (!previsaoTermino || resumo.dataPrevistaTermino > previsaoTermino)
+      ) {
+        previsaoTermino = resumo.dataPrevistaTermino
+      }
     }
-    return { totalRestante }
+    return { totalRestante, previsaoTermino }
   }, [dividas, parcelas])
+
+  function estaQuitada(divida: Divida): boolean {
+    const resumo = calcularResumoDivida(divida, parcelas)
+    return resumo.parcelasPagas > 0 && resumo.parcelasRestantes === 0
+  }
+
+  const dividasOrdenadas = useMemo(
+    () =>
+      [...dividas].sort((a, b) => {
+        const qa = estaQuitada(a) ? 1 : 0
+        const qb = estaQuitada(b) ? 1 : 0
+        return qa - qb
+      }),
+    [dividas, parcelas]
+  )
 
   async function handleSalvarDivida(dados: NovaDivida) {
     if (dividaEditando) {
@@ -127,7 +151,6 @@ export function Dividas() {
     <>
       <PageHeader
         title="Dívidas"
-        subtitle={`Total restante: ${formatCurrency(resumoGeral.totalRestante)}`}
         action={
           <button
             onClick={abrirNovaDivida}
@@ -138,6 +161,38 @@ export function Dividas() {
           </button>
         }
       />
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+        <div className="rounded-2xl border border-line bg-surface shadow-lg shadow-expense/[0.12] overflow-hidden">
+          <div className="h-1 bg-gradient-to-r from-expense to-expense/0" />
+          <div className="p-5 flex items-center gap-3.5">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-expense-soft ring-1 ring-inset ring-white/5">
+              <Wallet className="h-5 w-5 text-expense" strokeWidth={2.1} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-ink-muted">Total restante</p>
+              <p className="text-2xl font-bold text-ink mt-0.5 tracking-tight truncate">
+                {formatCurrency(resumoGeral.totalRestante)}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-line bg-surface shadow-lg shadow-brand/[0.12] overflow-hidden">
+          <div className="h-1 bg-gradient-to-r from-brand to-brand/0" />
+          <div className="p-5 flex items-center gap-3.5">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-soft ring-1 ring-inset ring-white/5">
+              <CalendarCheck2 className="h-5 w-5 text-brand" strokeWidth={2.1} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-ink-muted">Previsão de término</p>
+              <p className="text-2xl font-bold text-ink mt-0.5 tracking-tight truncate">
+                {resumoGeral.previsaoTermino ? formatDate(resumoGeral.previsaoTermino) : 'Tudo quitado 🎉'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {erro && (
         <div className="mb-4 rounded-xl border border-expense/25 bg-expense-soft px-4 py-3 text-sm text-expense">
@@ -187,8 +242,9 @@ export function Dividas() {
         />
       ) : (
         <div className="space-y-3">
-          {dividas.map((divida) => {
+          {dividasOrdenadas.map((divida) => {
             const resumo = calcularResumoDivida(divida, parcelas)
+            const quitada = estaQuitada(divida)
             const parcelasDaDivida = parcelas
               .filter((p) => p.idDivida === divida.id)
               .sort((a, b) => a.numeroParcela - b.numeroParcela)
@@ -197,14 +253,27 @@ export function Dividas() {
               divida.valorTotal > 0 ? (resumo.totalPago / divida.valorTotal) * 100 : 0
 
             return (
-              <div key={divida.id} className="rounded-2xl border border-line bg-surface p-4 shadow-sm shadow-slate-900/[0.02]">
+              <div
+                key={divida.id}
+                className={`rounded-2xl border border-line bg-surface p-4 shadow-sm shadow-slate-900/[0.02] ${
+                  quitada ? 'opacity-60' : ''
+                }`}
+              >
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="font-semibold text-ink">{divida.descricao}</p>
+                    <p className={`font-semibold ${quitada ? 'text-ink-faint' : 'text-ink'}`}>
+                      {divida.descricao}
+                    </p>
                     <p className="text-xs text-ink-muted">
-                      {resumo.parcelasPagas}/{divida.numParcelas} parcelas pagas
-                      {resumo.dataPrevistaTermino &&
-                        ` · Término previsto: ${formatDate(resumo.dataPrevistaTermino)}`}
+                      {quitada ? (
+                        'Quitada ✓'
+                      ) : (
+                        <>
+                          {resumo.parcelasPagas}/{divida.numParcelas} parcelas pagas
+                          {resumo.dataPrevistaTermino &&
+                            ` · Término previsto: ${formatDate(resumo.dataPrevistaTermino)}`}
+                        </>
+                      )}
                     </p>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
@@ -225,7 +294,7 @@ export function Dividas() {
                 </div>
 
                 <div className="flex items-baseline justify-between mt-3">
-                  <span className="text-lg font-semibold text-ink">
+                  <span className={`text-lg font-semibold ${quitada ? 'text-ink-faint' : 'text-ink'}`}>
                     {formatCurrency(resumo.totalPago)}
                   </span>
                   <span className="text-xs text-ink-muted">
@@ -236,7 +305,7 @@ export function Dividas() {
 
                 <div className="h-2 rounded-full bg-surface-2 mt-2 overflow-hidden">
                   <div
-                    className="h-full bg-brand"
+                    className={`h-full ${quitada ? 'bg-ink-faint' : 'bg-brand'}`}
                     style={{ width: `${Math.min(percentualPago, 100)}%` }}
                   />
                 </div>

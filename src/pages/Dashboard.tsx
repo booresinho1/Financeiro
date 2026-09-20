@@ -392,32 +392,32 @@ export function Dashboard() {
             </CardBase>
 
             <CardBase eyebrow="Compromissos futuros" className="sm:col-span-2">
-              <div className="grid grid-cols-3 gap-4 mt-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mt-4">
                 <div className="flex items-center gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-2 ring-1 ring-inset ring-white/5">
+                  <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl bg-surface-2 ring-1 ring-inset ring-white/5">
                     <Repeat className="h-[18px] w-[18px] text-ink-muted" />
                   </span>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1 flex items-center justify-between sm:block gap-2">
                     <p className="text-[11px] text-ink-faint truncate">Custos fixos</p>
-                    <p className="text-lg font-bold text-ink truncate">
+                    <p className="text-base sm:text-lg font-bold text-ink truncate">
                       {formatCurrency(custosFixosDoPeriodo)}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 border-l border-line-soft pl-4">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-2 ring-1 ring-inset ring-white/5">
+                <div className="flex items-center gap-3 pt-3 sm:pt-0 border-t sm:border-t-0 sm:border-l border-line-soft sm:pl-4">
+                  <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl bg-surface-2 ring-1 ring-inset ring-white/5">
                     <CreditCard className="h-[18px] w-[18px] text-ink-muted" />
                   </span>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1 flex items-center justify-between sm:block gap-2">
                     <p className="text-[11px] text-ink-faint truncate">Parcelas</p>
-                    <p className="text-lg font-bold text-ink truncate">
+                    <p className="text-base sm:text-lg font-bold text-ink truncate">
                       {formatCurrency(parcelasDoPeriodo)}
                     </p>
                   </div>
                 </div>
-                <div className="border-l border-line-soft pl-4">
+                <div className="flex items-center justify-between sm:block gap-2 pt-3 sm:pt-0 border-t sm:border-t-0 sm:border-l border-line-soft sm:pl-4">
                   <p className="text-[11px] text-ink-faint truncate">Total comprometido</p>
-                  <p className="text-lg font-bold text-brand truncate">
+                  <p className="text-base sm:text-lg font-bold text-brand truncate">
                     {formatCurrency(totalComprometido)}
                   </p>
                 </div>
@@ -426,7 +426,7 @@ export function Dashboard() {
           </div>
 
           <CardBase eyebrow="Entradas vs. despesas">
-            <EntradasDespesasChart entradas={entradas} despesas={despesas} periodo={periodo} meses={4} />
+            <EntradasDespesasChart entradas={entradas} despesas={despesas} periodo={periodo} />
           </CardBase>
         </div>
       </div>

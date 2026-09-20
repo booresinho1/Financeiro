@@ -11,6 +11,7 @@ import { formatCurrency, formatDate } from '@/lib/format'
 import { calcularProvisionamento } from '@/lib/provisionamento'
 import type { CustoFixo } from '@/types/finance'
 import type { NovoCustoFixo } from '@/repositories/custosFixosRepository'
+import type { NovoPagamentoCustoFixo } from '@/repositories/pagamentosCustosFixosRepository'
 
 const MESES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -28,7 +29,7 @@ function labelPeriodo(periodo: string): string {
 
 export function CustosFixos() {
   const { custosFixos, carregando, erro, criar, atualizar, excluir } = useCustosFixos()
-  const { despesas } = useDespesas()
+  const { despesas, criar: criarDespesa } = useDespesas()
   const { pagamentos, registrar: registrarPagamento, desmarcar: desmarcarPagamento } =
     usePagamentosCustosFixos()
 
@@ -89,6 +90,24 @@ export function CustosFixos() {
   async function handleExcluir(custoFixo: CustoFixo) {
     if (!confirm(`Excluir o custo fixo "${custoFixo.descricao}"?`)) return
     await excluir(custoFixo.id)
+  }
+
+  async function handleRegistrarPagamento(dados: NovoPagamentoCustoFixo) {
+    if (!pagando) return
+
+    let idDespesa = dados.idDespesa
+    if (!idDespesa) {
+      const despesaCriada = await criarDespesa({
+        data: dados.dataPagamento,
+        descricao: pagando.descricao,
+        valor: dados.valorPago,
+        categoria: pagando.categoria,
+        subcategoria: pagando.subcategoria,
+      })
+      idDespesa = despesaCriada.id
+    }
+
+    await registrarPagamento({ ...dados, idDespesa })
   }
 
   async function handleDesmarcarPagamento(pagamentoId: string) {
@@ -238,7 +257,7 @@ export function CustosFixos() {
           despesasDoPeriodo={despesasDoPeriodo}
           despesaSugerida={calcularProvisionamento(pagando, despesasDoPeriodo).despesaVinculada}
           onClose={() => setPagando(undefined)}
-          onSubmit={registrarPagamento}
+          onSubmit={handleRegistrarPagamento}
         />
       )}
     </>

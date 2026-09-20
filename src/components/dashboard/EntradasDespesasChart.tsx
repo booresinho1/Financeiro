@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bar,
   BarChart,
@@ -19,8 +19,31 @@ const MESES_ABREV = [
   'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez',
 ]
 
+// Largura mínima confortável (px) pra um grupo de 2 barras + rótulos não colidirem.
+const LARGURA_POR_MES = 78
+// Abaixo disso nem os rótulos diretos cabem — melhor confiar só no tooltip.
+const LARGURA_MINIMA_PARA_ROTULO = 55
+
 function formatCurrencyCompacto(v: number): string {
   return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+}
+
+function useLarguraContainer<T extends HTMLElement>() {
+  const ref = useRef<T>(null)
+  const [largura, setLargura] = useState(0)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const observer = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width
+      if (w) setLargura(w)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  return [ref, largura] as const
 }
 
 interface EntradasDespesasChartProps {
@@ -65,9 +88,16 @@ export function EntradasDespesasChart({
     brand: COR_ENTRADAS,
     expense: COR_DESPESAS,
   } = useChartColors()
+  const [containerRef, largura] = useLarguraContainer<HTMLDivElement>()
+
+  const mesesQueCabem = largura > 0 ? Math.max(2, Math.floor(largura / LARGURA_POR_MES)) : meses
+  const mesesExibidos = Math.min(meses, mesesQueCabem)
+  const larguraPorGrupo = largura / Math.max(mesesExibidos, 1)
+  const mostrarRotulos = larguraPorGrupo >= LARGURA_MINIMA_PARA_ROTULO
+
   const dados = useMemo(() => {
     const pontos = []
-    for (let i = meses - 1; i >= 0; i--) {
+    for (let i = mesesExibidos - 1; i >= 0; i--) {
       const mesRef = somarMeses(`${periodo}-01`, -i).slice(0, 7)
       const ano = Number(mesRef.slice(0, 4))
       const mesNum = Number(mesRef.slice(5, 7))
@@ -84,52 +114,58 @@ export function EntradasDespesasChart({
       })
     }
     return pontos
-  }, [entradas, despesas, periodo, meses])
+  }, [entradas, despesas, periodo, mesesExibidos])
 
   return (
-    <ResponsiveContainer width="100%" height={224}>
-      <BarChart data={dados} margin={{ top: 24, right: 8, bottom: 0, left: 0 }} barGap={2}>
-        <CartesianGrid stroke={GRID} vertical={false} />
-        <XAxis
-          dataKey="mes"
-          tick={{ fill: INK_MUTED, fontSize: 11 }}
-          axisLine={{ stroke: GRID }}
-          tickLine={false}
-        />
-        <YAxis
-          tick={{ fill: INK_MUTED, fontSize: 11 }}
-          tickFormatter={(v) => formatCurrency(v)}
-          axisLine={false}
-          tickLine={false}
-          width={72}
-        />
-        <Tooltip content={<TooltipConteudo />} cursor={{ fill: cursorFill }} />
-        <Legend
-          wrapperStyle={{ fontSize: 12, color: INK_SECUNDARIA }}
-          iconType="circle"
-          iconSize={8}
-        />
-        <Bar dataKey="Entradas" fill={COR_ENTRADAS} radius={[4, 4, 0, 0]} maxBarSize={18}>
-          <LabelList
-            dataKey="Entradas"
-            position="top"
-            formatter={(v) => (Number(v) > 0 ? formatCurrencyCompacto(Number(v)) : '')}
-            fill={INK_SECUNDARIA}
-            fontSize={9}
-            fontWeight={600}
+    <div ref={containerRef}>
+      <ResponsiveContainer width="100%" height={224}>
+        <BarChart data={dados} margin={{ top: 24, right: 8, bottom: 0, left: 0 }} barGap={2}>
+          <CartesianGrid stroke={GRID} vertical={false} />
+          <XAxis
+            dataKey="mes"
+            tick={{ fill: INK_MUTED, fontSize: 11 }}
+            axisLine={{ stroke: GRID }}
+            tickLine={false}
           />
-        </Bar>
-        <Bar dataKey="Despesas" fill={COR_DESPESAS} radius={[4, 4, 0, 0]} maxBarSize={18}>
-          <LabelList
-            dataKey="Despesas"
-            position="top"
-            formatter={(v) => (Number(v) > 0 ? formatCurrencyCompacto(Number(v)) : '')}
-            fill={INK_SECUNDARIA}
-            fontSize={9}
-            fontWeight={600}
+          <YAxis
+            tick={{ fill: INK_MUTED, fontSize: 11 }}
+            tickFormatter={(v) => formatCurrency(v)}
+            axisLine={false}
+            tickLine={false}
+            width={72}
           />
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+          <Tooltip content={<TooltipConteudo />} cursor={{ fill: cursorFill }} />
+          <Legend
+            wrapperStyle={{ fontSize: 12, color: INK_SECUNDARIA }}
+            iconType="circle"
+            iconSize={8}
+          />
+          <Bar dataKey="Entradas" fill={COR_ENTRADAS} radius={[4, 4, 0, 0]} maxBarSize={18}>
+            {mostrarRotulos && (
+              <LabelList
+                dataKey="Entradas"
+                position="top"
+                formatter={(v) => (Number(v) > 0 ? formatCurrencyCompacto(Number(v)) : '')}
+                fill={INK_SECUNDARIA}
+                fontSize={9}
+                fontWeight={600}
+              />
+            )}
+          </Bar>
+          <Bar dataKey="Despesas" fill={COR_DESPESAS} radius={[4, 4, 0, 0]} maxBarSize={18}>
+            {mostrarRotulos && (
+              <LabelList
+                dataKey="Despesas"
+                position="top"
+                formatter={(v) => (Number(v) > 0 ? formatCurrencyCompacto(Number(v)) : '')}
+                fill={INK_SECUNDARIA}
+                fontSize={9}
+                fontWeight={600}
+              />
+            )}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   )
 }
