@@ -123,3 +123,120 @@ export interface PagamentoCustoFixo {
   dataPagamento: string
   idDespesa?: string
 }
+
+export interface PluggyItem {
+  id: string
+  itemId: string
+  conector?: string
+  criadoEm: string
+}
+
+export type StatusTransacaoPendente = 'PENDENTE' | 'IMPORTADA' | 'IGNORADA'
+
+export interface TransacaoPendente {
+  id: string
+  pluggyId: string
+  itemId: string
+  contaPluggy?: string
+  data: string
+  descricao: string
+  valor: number
+  tipo: 'ENTRADA' | 'DESPESA'
+  status: StatusTransacaoPendente
+  tipoConta?: string | null
+  parcelaNumero?: number | null
+  parcelaTotal?: number | null
+  dataCompra?: string | null
+  /** despesa ou entrada do app ligada a esta transação; numa nota dividida, os ids separados por vírgula */
+  idLancamento?: string | null
+}
+
+export interface CompraCartao {
+  id: string
+  data: string
+  descricao: string
+  valor: number
+  categoria: string | null
+  finalCartao: string | null
+  parcela: string | null
+}
+
+export interface ParcelaCartao {
+  id: string
+  descricao: string
+  numero: number
+  total: number
+  valor: number
+  restantes: number
+  valorRestante: number
+  dataCompra: string | null
+}
+
+export interface CartaoResumo {
+  id: string
+  banco: string
+  nome: string
+  final: string | null
+  bandeira: string | null
+  limite: number | null
+  limiteDisponivel: number | null
+  usado: number
+  atualizadoEm: string | null
+  faturaAberta: {
+    fechamentoEstimado: string | null
+    vencimentoEstimado: string | null
+    lancado: number
+    parcelasPrevistas: number
+    total: number
+    compras: CompraCartao[]
+  }
+  ultimaFatura: {
+    id: string
+    fechamento: string | null
+    vencimento: string
+    total: number
+    minimo: number | null
+    pago: number
+    dataPagamento: string | null
+  } | null
+  faturas: {
+    id: string
+    fechamento: string | null
+    vencimento: string
+    total: number
+    encargos: number
+  }[]
+  parcelas: ParcelaCartao[]
+  totalParcelasRestantes: number
+  proximasFaturas: { vencimentoEstimado: string | null; valor: number; parcelas: number }[]
+}
+
+export interface ContaBanco {
+  id: string
+  nome: string
+  tipo: 'BANK' | 'CREDIT' | string
+  subtipo: string | null
+  saldo: number
+  limite: number | null
+  limiteDisponivel: number | null
+  vencimento: string | null
+  fechamento: string | null
+}
+
+export interface BancoConectado {
+  itemId: string
+  conectorId: number
+  nome: string
+  imageUrl: string | null
+  cor: string | null
+  status: string
+  atualizadoEm: string | null
+  contas: ContaBanco[]
+}
+
+export interface ContaPluggy {
+  id: string
+  nome: string
+  tipo: string
+  saldo: number
+}

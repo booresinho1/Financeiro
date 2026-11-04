@@ -5,6 +5,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { OrcamentoFormModal } from '@/components/orcamentos/OrcamentoFormModal'
 import { useOrcamentos } from '@/hooks/useOrcamentos'
 import { useDespesas } from '@/hooks/useDespesas'
+import { emojiDaCategoria } from '@/lib/emojiCategoria'
 import { formatCurrency } from '@/lib/format'
 import { calcularStatus, CORES_STATUS } from '@/lib/statusOrcamento'
 import type { Orcamento } from '@/types/finance'
@@ -219,7 +220,9 @@ export function Orcamentos() {
               <div key={o.id} className="rounded-2xl border border-line bg-surface p-4 shadow-sm shadow-slate-900/[0.02]">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="font-semibold text-ink">{o.categoria}</p>
+                    <p className="font-semibold text-ink">
+                      {emojiDaCategoria(o.subcategoria || o.categoria)} {o.categoria}
+                    </p>
                     {o.subcategoria && <p className="text-xs text-ink-muted">{o.subcategoria}</p>}
                   </div>
                   <div className="flex items-center gap-1">

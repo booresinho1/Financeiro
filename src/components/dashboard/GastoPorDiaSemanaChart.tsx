@@ -77,7 +77,8 @@ export function GastoPorDiaSemanaChart({ despesas }: GastoPorDiaSemanaChartProps
     }
 
     for (const [dataIso, valoresPorCategoria] of somaPorDataPorCategoria) {
-      const wd = new Date(dataIso).getDay()
+      // só a data seria lida como meia-noite UTC, que no Brasil ainda é o dia anterior
+      const wd = new Date(`${dataIso.slice(0, 10)}T12:00:00`).getDay()
       for (const cat of CATEGORIAS) {
         if (valoresPorCategoria[cat] === undefined) continue
         somaPorDiaSemana[cat][wd] += valoresPorCategoria[cat]

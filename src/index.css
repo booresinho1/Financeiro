@@ -1,38 +1,52 @@
-@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
 
-  /* brand */
-  --color-brand: #c9a227;
-  --color-brand-hover: #b18b1e;
-  --color-brand-soft: #f5ebc7;
+  /* brand: violeta elétrico (interativo) + limão (detalhe, só sobre o painel escuro) */
+  --color-brand: #5b4cf0;
+  --color-brand-hover: #4a3be0;
+  --color-brand-soft: #eeecfe;
+  --color-accent: #c8f560;
+
+  /* painel de destaque: escuro nos dois temas */
+  --color-panel: #0e1016;
+  --color-panel-2: #171a24;
+  --color-panel-ink: #f4f6fb;
 
   /* surfaces */
-  --color-app: #fafaf8;
+  --color-app: #f3f4f7;
   --color-surface: #ffffff;
-  --color-surface-2: #f3f2ee;
-  --color-line: #e5e2d8;
-  --color-line-soft: #eeece4;
+  --color-surface-2: #f2f3f7;
+  --color-line: #e3e5ec;
+  --color-line-soft: #eceef3;
 
   /* text */
-  --color-ink: #1c1c1a;
-  --color-ink-soft: #3a3a36;
-  --color-ink-muted: #6f6d67;
-  --color-ink-faint: #9c9a92;
+  --color-ink: #0c0e14;
+  --color-ink-soft: #2a2f3b;
+  --color-ink-muted: #5d6474;
+  --color-ink-faint: #8e95a5;
 
   /* status */
-  --color-income: #2e9b68;
-  --color-income-soft: #e5f4ec;
-  --color-expense: #d65c5c;
-  --color-expense-soft: #fbebeb;
-  --color-info: #4f7cac;
-  --color-info-soft: #eaf1f8;
-  --color-warning: #d99a3d;
-  --color-warning-soft: #faf0df;
+  --color-income: #12a150;
+  --color-income-soft: #e3f6ea;
+  --color-expense: #e5484d;
+  --color-expense-soft: #fdecec;
+  --color-info: #3e7bdc;
+  --color-info-soft: #e9f1fd;
+  --color-warning: #c27c0e;
+  --color-warning-soft: #fdf3e1;
+
+  /* séries dos gráficos (validadas p/ daltonismo, ver chartTheme.ts) */
+  --color-serie-entrada: #6d5efc;
+  --color-serie-despesa: #f2683c;
+
+  --shadow-card: 0 1px 3px rgb(16 24 40 / 0.06), 0 1px 2px rgb(16 24 40 / 0.04),
+    0 0 0 1px rgb(16 24 40 / 0.02);
+  --shadow-pop: 0 12px 32px -8px rgb(16 24 40 / 0.18), 0 2px 6px rgb(16 24 40 / 0.06);
 }
 
 :root {
@@ -41,29 +55,38 @@
 
 .dark {
   color-scheme: dark;
-  --color-brand: #d4af37;
-  --color-brand-hover: #e0c45c;
-  --color-brand-soft: #3a321c;
+  --color-brand: #8b80ff;
+  --color-brand-hover: #a39aff;
+  --color-brand-soft: #221f45;
 
-  --color-app: #11110f;
-  --color-surface: #1f1f1c;
-  --color-surface-2: #262621;
-  --color-line: #35342f;
-  --color-line-soft: #2a2924;
+  --color-panel: #151824;
+  --color-panel-2: #1d2130;
 
-  --color-ink: #f5f5f2;
-  --color-ink-soft: #d8d6d0;
-  --color-ink-muted: #a9a79f;
-  --color-ink-faint: #78766f;
+  --color-app: #0a0b0f;
+  --color-surface: #12141a;
+  --color-surface-2: #1a1d25;
+  --color-line: #252934;
+  --color-line-soft: #1d2029;
 
-  --color-income: #33c481;
-  --color-income-soft: #16281f;
-  --color-expense: #ff6b6b;
-  --color-expense-soft: #2e1a1a;
-  --color-info: #6fa8e6;
-  --color-info-soft: #182636;
-  --color-warning: #ffb347;
-  --color-warning-soft: #2e2313;
+  --color-ink: #f2f4f8;
+  --color-ink-soft: #c9ceda;
+  --color-ink-muted: #8b93a5;
+  --color-ink-faint: #5f6678;
+
+  --color-income: #3ddc84;
+  --color-income-soft: #11291c;
+  --color-expense: #ff6369;
+  --color-expense-soft: #2c1517;
+  --color-info: #6fa8f5;
+  --color-info-soft: #152236;
+  --color-warning: #f5b341;
+  --color-warning-soft: #2b2112;
+
+  --color-serie-entrada: #8b80ff;
+  --color-serie-despesa: #e8643c;
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-pop: 0 16px 40px -8px rgb(0 0 0 / 0.6), 0 2px 6px rgb(0 0 0 / 0.4);
 }
 
 html {
@@ -76,4 +99,64 @@ body {
   color: var(--color-ink);
   -webkit-font-smoothing: antialiased;
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "ss01", "cv11";
+}
+
+/* entrada dos cards: sobe e aparece; o atraso vem por style (cascata) */
+@keyframes surgir {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes aparecer {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes escurecer {
+  from {
+    opacity: 0;
+  }
+}
+
+@utility animate-surgir {
+  animation: surgir 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@utility animate-aparecer {
+  animation: aparecer 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@utility animate-escurecer {
+  animation: escurecer 0.18s ease-out both;
+}
+
+@utility sem-barra {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

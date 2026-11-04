@@ -1,24 +1,33 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import {
-  Wallet,
-  TrendingUp,
   TrendingDown,
-  ArrowDownToLine,
-  Receipt,
-  Scale,
-  Repeat,
-  CreditCard,
   Target,
   ChevronLeft,
   ChevronRight,
-  X,
-  ArrowUpDown,
+  AlertTriangle,
+  Landmark,
+  PiggyBank,
+  ArrowUpRight,
+  CalendarDays,
+  PieChart,
+  CreditCard,
+  type LucideIcon,
 } from 'lucide-react'
-import { PageHeader } from '@/components/ui/PageHeader'
-import { EntradasDespesasChart } from '@/components/dashboard/EntradasDespesasChart'
-import { DespesasPorCategoriaChart } from '@/components/dashboard/DespesasPorCategoriaChart'
-import { ComprometimentoMensalChart } from '@/components/dashboard/ComprometimentoMensalChart'
-import { GastoPorDiaSemanaChart } from '@/components/dashboard/GastoPorDiaSemanaChart'
+import {
+  composicaoDoMes,
+  idsDespesasFixas,
+  colorirSegmentos,
+  grupoDaDespesa,
+} from '@/lib/ritmo'
+import type { Despesa, TransacaoPendente } from '@/types/finance'
+import { CardsBancos } from '@/components/dashboard/CardsBancos'
+import { CalendarioMes } from '@/components/dashboard/CalendarioMes'
+import { ModalDetalhe } from '@/components/dashboard/ModalDetalhe'
+import { PainelCaixa, type CliqueCaixa } from '@/components/inicio/PainelCaixa'
+import { PainelOrcamentos } from '@/components/inicio/PainelOrcamentos'
+import { useAuth } from '@/contexts/AuthContext'
+import { EMAIL_MASTER } from '@/lib/navigation'
 import { useDespesas } from '@/hooks/useDespesas'
 import { useEntradas } from '@/hooks/useEntradas'
 import { useContas } from '@/hooks/useContas'
@@ -26,15 +35,37 @@ import { useMovimentacoes } from '@/hooks/useMovimentacoes'
 import { useCustosFixos } from '@/hooks/useCustosFixos'
 import { usePagamentosCustosFixos } from '@/hooks/usePagamentosCustosFixos'
 import { useParcelas } from '@/hooks/useParcelas'
+import { useDividas } from '@/hooks/useDividas'
 import { useMetas } from '@/hooks/useMetas'
-import { calcularSaldo, calcularTotalEmContas } from '@/lib/saldos'
-import { formatCurrency, formatDate } from '@/lib/format'
-import { somarMeses } from '@/lib/datas'
+import { useOrcamentos } from '@/hooks/useOrcamentos'
+import { useSaldosBancos } from '@/hooks/useSaldosBancos'
+import { useCartoes } from '@/hooks/useCartoes'
+import { pluggyRepository } from '@/repositories/pluggyRepository'
+import { calcularSaldo } from '@/lib/saldos'
+import { projetarFluxoCaixa } from '@/lib/fluxoCaixa'
+import { proximosVencimentos, orcamentosEstourados, vencimentosDoMes } from '@/lib/dashboardResumo'
+import { formatCurrency, formatDate, nomeBonito } from '@/lib/format'
+import { useChartColors } from '@/lib/chartTheme'
+import { detalheAPagar, detalheDespesas, type Detalhe } from '@/lib/detalhes'
+import {
+  calcularCaixa,
+  detalheEntradasPrevistas,
+  detalheFatura,
+  detalheSaldoContas,
+  detalheSobraDoMes,
+  resumirOrcamentos,
+  somarDias,
+  type LinhaOrcamento,
+} from '@/lib/inicio'
+import { hojeIso, somarMeses } from '@/lib/datas'
 
 const MESES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
 ]
+
+const DIAS_VENCIMENTOS = 15
+const DIAS_AVISO_FATURA = 7
 
 function periodoAtual(): string {
   return new Date().toISOString().slice(0, 7)
@@ -42,196 +73,234 @@ function periodoAtual(): string {
 
 function labelPeriodo(periodo: string): string {
   const [ano, mes] = periodo.split('-')
-  return `${MESES[Number(mes) - 1]}/${ano}`
+  return `${MESES[Number(mes) - 1]} ${ano}`
 }
 
-function splitMoeda(valorFormatado: string): [string, string] {
-  const idx = valorFormatado.lastIndexOf(',')
-  if (idx === -1) return [valorFormatado, '']
-  return [valorFormatado.slice(0, idx), valorFormatado.slice(idx + 1)]
+function labelMesCurto(periodo: string): string {
+  const [ano, mes] = periodo.split('-')
+  return `${MESES[Number(mes) - 1].slice(0, 3).toLowerCase()}/${ano.slice(2)}`
 }
 
-type CorAccent = 'income' | 'expense' | 'neutral'
-
-const ACCENT_GRADIENT: Record<CorAccent, string> = {
-  income: 'from-income to-income/0',
-  expense: 'from-expense to-expense/0',
-  neutral: 'from-ink-faint to-ink-faint/0',
-}
-const ACCENT_GLOW: Record<CorAccent, string> = {
-  income: 'shadow-income/[0.15]',
-  expense: 'shadow-expense/[0.15]',
-  neutral: 'shadow-black/30',
-}
-
-interface CardIndicadorProps {
-  titulo: string
-  valor: string
-  icone: typeof Wallet
-  cor: string
-  corFundo: string
-  accent: CorAccent
-  nota?: string
-}
-
-function CardIndicador({ titulo, valor, icone: Icone, cor, corFundo, accent, nota }: CardIndicadorProps) {
-  return (
-    <div
-      className={`rounded-2xl border border-line bg-surface shadow-lg ${ACCENT_GLOW[accent]} overflow-hidden transition-transform hover:-translate-y-0.5`}
-    >
-      <div className={`h-1 bg-gradient-to-r ${ACCENT_GRADIENT[accent]}`} />
-      <div className="p-5 flex items-center gap-3.5">
-        <span
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ring-1 ring-inset ring-white/5 ${corFundo}`}
-        >
-          <Icone className={`h-5 w-5 ${cor}`} strokeWidth={2.1} />
-        </span>
-        <div className="min-w-0">
-          <p className="text-xs font-medium text-ink-muted">{titulo}</p>
-          <p className="text-2xl font-bold text-ink mt-0.5 tracking-tight truncate">{valor}</p>
-          {nota && <p className="text-[11px] text-ink-faint mt-0.5 truncate">{nota}</p>}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function CardBase({
-  eyebrow,
-  children,
-  className = '',
-  accent,
-}: {
-  eyebrow: string
-  children: ReactNode
-  className?: string
-  accent?: CorAccent
-}) {
-  return (
-    <div
-      className={`rounded-2xl border border-line bg-surface shadow-lg ${accent ? ACCENT_GLOW[accent] : 'shadow-black/30'} overflow-hidden ${className}`}
-    >
-      {accent && <div className={`h-1 bg-gradient-to-r ${ACCENT_GRADIENT[accent]}`} />}
-      <div className="p-5">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
-          {eyebrow}
-        </span>
-        {children}
-      </div>
-    </div>
-  )
+interface Alerta {
+  id: string
+  icone: LucideIcon
+  texto: ReactNode
+  to: string
+  grave: boolean
 }
 
 export function Dashboard() {
-  const { despesas } = useDespesas()
-  const { entradas } = useEntradas()
-  const { contas } = useContas()
-  const { movimentacoes } = useMovimentacoes()
+  const { user } = useAuth()
+  // bancos e cartão são só do dono da conta: os demais usuários usam o saldo pelos lançamentos
+  const temBanco = user?.email === EMAIL_MASTER
+
+  const { despesas, carregando: carregandoDespesas } = useDespesas()
+  const { entradas, carregando: carregandoEntradas } = useEntradas()
+  const { contas, carregando: carregandoContas } = useContas()
+  const { movimentacoes, carregando: carregandoMovimentacoes } = useMovimentacoes()
   const { custosFixos } = useCustosFixos()
   const { pagamentos: pagamentosCustosFixos } = usePagamentosCustosFixos()
   const { parcelas } = useParcelas()
+  const { dividas } = useDividas()
   const { metas } = useMetas()
+  const { orcamentos } = useOrcamentos()
+  const { bancos, carregando: carregandoBancos, erro: erroBancos } = useSaldosBancos(temBanco)
+  const { cartoes, carregando: carregandoCartoes, erro: erroCartoes } = useCartoes(temBanco)
+  const carregandoCaixa =
+    carregandoBancos ||
+    carregandoCartoes ||
+    carregandoDespesas ||
+    carregandoEntradas ||
+    carregandoContas ||
+    carregandoMovimentacoes
 
   const [periodo, setPeriodo] = useState(periodoAtual())
-  const [mesInicialComprometido, setMesInicialComprometido] = useState(periodoAtual())
-  const [mesFinalComprometido, setMesFinalComprometido] = useState(
-    somarMeses(`${periodoAtual()}-01`, 2).slice(0, 7)
-  )
-  const [categoriaSelecionada, setCategoriaSelecionada] = useState<string | null>(null)
-  const [ordenarTabelaPor, setOrdenarTabelaPor] = useState<'data' | 'valor'>('data')
-  const [ordemTabelaAsc, setOrdemTabelaAsc] = useState(false)
+  const [pendentes, setPendentes] = useState<TransacaoPendente[]>([])
+  const [detalhe, setDetalhe] = useState<Detalhe | null>(null)
+  const cores = useChartColors()
 
+  // a fila do Pluggy é opcional: se a integração não estiver configurada, só não mostra o alerta
   useEffect(() => {
-    setCategoriaSelecionada(null)
-  }, [periodo])
+    if (!temBanco) return
+    pluggyRepository
+      .listarPendentes()
+      .then((lista) => setPendentes(lista.filter((t) => t.status === 'PENDENTE')))
+      .catch(() => setPendentes([]))
+  }, [temBanco])
 
+  const hoje = hojeIso()
+  const mesHoje = hoje.slice(0, 7)
   const dadosSaldo = { despesas, entradas, movimentacoes }
+  const contaAutomatica = contas.filter((c) => c.ativa).find((c) => c.tipo === 'AUTOMATICA')
+  const saldoNoApp = contaAutomatica
+    ? {
+        id: contaAutomatica.id,
+        nome: contaAutomatica.nome,
+        saldo: calcularSaldo(contaAutomatica, dadosSaldo),
+      }
+    : null
 
-  const contaAutomatica = contas.find((c) => c.tipo === 'AUTOMATICA' && c.ativa)
-  const dinheiroDisponivel = contaAutomatica ? calcularSaldo(contaAutomatica, dadosSaldo) : 0
-
-  const ehMesAtual = periodo === periodoAtual()
-  const diasRestantesMes = useMemo(() => {
-    if (!ehMesAtual) return null
-    const hoje = new Date()
-    const ultimoDiaMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate()
-    return ultimoDiaMes - hoje.getDate() + 1
-  }, [ehMesAtual])
-  const valorDisponivelPorDia =
-    diasRestantesMes && dinheiroDisponivel > 0 ? dinheiroDisponivel / diasRestantesMes : null
-  const totalEmContas = useMemo(
-    () => calcularTotalEmContas(contas, dadosSaldo),
-    [contas, despesas, entradas, movimentacoes]
+  const dadosVencimentos = useMemo(
+    () => ({ custosFixos, pagamentos: pagamentosCustosFixos, parcelas, dividas }),
+    [custosFixos, pagamentosCustosFixos, parcelas, dividas]
+  )
+  const vencimentos = useMemo(
+    () => proximosVencimentos(dadosVencimentos, hoje, DIAS_VENCIMENTOS),
+    [dadosVencimentos, hoje]
+  )
+  const vencimentosMesHoje = useMemo(
+    () => vencimentosDoMes(dadosVencimentos, mesHoje, hoje),
+    [dadosVencimentos, mesHoje, hoje]
+  )
+  const vencimentosDoPeriodo = useMemo(
+    () => vencimentosDoMes(dadosVencimentos, periodo, hoje),
+    [dadosVencimentos, periodo, hoje]
+  )
+  const idsFixos = useMemo(
+    () => idsDespesasFixas(parcelas, pagamentosCustosFixos),
+    [parcelas, pagamentosCustosFixos]
   )
 
-  const entradasDoPeriodo = useMemo(
-    () =>
-      entradas
-        .filter((e) => e.data.slice(0, 7) === periodo && e.status === 'RECEBIDA')
-        .reduce((s, e) => s + e.valor, 0),
-    [entradas, periodo]
+  const caixa = calcularCaixa(
+    {
+      bancos,
+      saldoNoApp,
+      cartoes,
+      vencimentosDoMes: vencimentosMesHoje,
+      parcelas,
+      dividas,
+      entradas,
+      despesas,
+      idsFixos,
+    },
+    hoje
   )
-  const entradasPrevistasDoPeriodo = useMemo(
-    () =>
-      entradas
-        .filter((e) => e.data.slice(0, 7) === periodo && e.status === 'PREVISTA')
-        .reduce((s, e) => s + e.valor, 0),
-    [entradas, periodo]
+
+  const avisosCaixa = [
+    ...(erroBancos ? ['Não consegui ler os bancos: o saldo usa os lançamentos do app.'] : []),
+    ...(erroCartoes && caixa.origemSaldo === 'banco'
+      ? ['Não consegui ler o cartão: a fatura está fora dessa conta.']
+      : []),
+  ]
+
+  const resumoOrcamentos = useMemo(
+    () => resumirOrcamentos(orcamentos, despesas, periodo, hoje),
+    [orcamentos, despesas, periodo, hoje]
   )
-  const despesasFiltradas = useMemo(
-    () => despesas.filter((d) => d.data.slice(0, 7) === periodo),
-    [despesas, periodo]
-  )
-  const despesasDaTabela = useMemo(() => {
-    const filtradas = despesasFiltradas.filter(
-      (d) => !categoriaSelecionada || d.categoria === categoriaSelecionada
+  const comprasNaFila = useMemo(() => {
+    const doMes = pendentes.filter(
+      (t) => t.tipo === 'DESPESA' && (t.dataCompra ?? t.data).slice(0, 7) === periodo
     )
-    return [...filtradas].sort((a, b) => {
-      let comparacao = 0
-      if (ordenarTabelaPor === 'valor') comparacao = a.valor - b.valor
-      else comparacao = a.data.localeCompare(b.data)
-      return ordemTabelaAsc ? comparacao : -comparacao
-    })
-  }, [despesasFiltradas, categoriaSelecionada, ordenarTabelaPor, ordemTabelaAsc])
+    return { quantidade: doMes.length, valor: doMes.reduce((s, t) => s + t.valor, 0) }
+  }, [pendentes, periodo])
 
-  function alternarOrdenacaoTabela(campo: 'data' | 'valor') {
-    if (ordenarTabelaPor === campo) {
-      setOrdemTabelaAsc((atual) => !atual)
-    } else {
-      setOrdenarTabelaPor(campo)
-      setOrdemTabelaAsc(false)
+  // o calendário usa os mesmos pedaços e cores da barra "Para onde foi", da Análise
+  const composicao = useMemo(
+    () => composicaoDoMes(despesas, periodo, idsFixos, 0, 0),
+    [despesas, periodo, idsFixos]
+  )
+  const categoriasDestaque = useMemo(
+    () => composicao.filter((c) => c.tipo === 'categoria').map((c) => c.nome),
+    [composicao]
+  )
+  const gruposCalendario = useMemo(
+    () =>
+      colorirSegmentos(composicao, cores)
+        .filter((s) => ['fixos', 'parcelas', 'categoria', 'outros'].includes(s.tipo))
+        .map((s) => ({ id: s.id, nome: nomeBonito(s.nome), cor: s.cor })),
+    [composicao, cores]
+  )
+  const grupoDe = useCallback(
+    (d: Despesa) => grupoDaDespesa(d, idsFixos, categoriasDestaque),
+    [idsFixos, categoriasDestaque]
+  )
+
+  const projecao = useMemo(
+    () =>
+      projetarFluxoCaixa(
+        {
+          contas,
+          despesas,
+          entradas,
+          movimentacoes,
+          custosFixos,
+          pagamentos: pagamentosCustosFixos,
+          parcelas,
+        },
+        hoje,
+        12
+      ),
+    [contas, despesas, entradas, movimentacoes, custosFixos, pagamentosCustosFixos, parcelas, hoje]
+  )
+
+  const alertas = useMemo(() => {
+    const lista: Alerta[] = []
+    // com saldo do banco, o painel logo abaixo já responde; a projeção usa os lançamentos e daria outro número
+    const negativo = caixa.origemSaldo === 'app' && projecao.find((l) => l.saldo < 0)
+    if (negativo) {
+      lista.push({
+        id: 'saldo',
+        icone: TrendingDown,
+        texto: <>Saldo projetado negativo em {labelMesCurto(negativo.mes)}</>,
+        to: '/analise',
+        grave: true,
+      })
     }
-  }
-  const despesasDoPeriodo = useMemo(
-    () => despesasFiltradas.reduce((s, d) => s + d.valor, 0),
-    [despesasFiltradas]
-  )
-  const resultado = entradasDoPeriodo - despesasDoPeriodo
-
-  const custosFixosDoPeriodo = useMemo(
-    () =>
-      custosFixos
-        .filter(
-          (c) =>
-            c.ativo &&
-            c.dataInicio.slice(0, 7) <= periodo &&
-            !pagamentosCustosFixos.some((p) => p.idCustoFixo === c.id && p.periodo === periodo)
-        )
-        .reduce((s, c) => s + c.valorPrevisto, 0),
-    [custosFixos, pagamentosCustosFixos, periodo]
-  )
-  const parcelasDoPeriodo = useMemo(
-    () =>
-      parcelas
-        .filter(
-          (p) =>
-            p.dataVencimento.slice(0, 7) === periodo &&
-            (p.status === 'PENDENTE' || p.status === 'ATRASADA')
-        )
-        .reduce((s, p) => s + p.valorPrevisto, 0),
-    [parcelas, periodo]
-  )
-  const totalComprometido = custosFixosDoPeriodo + parcelasDoPeriodo
+    const vencidos = vencimentos.filter((v) => v.vencido)
+    if (vencidos.length) {
+      lista.push({
+        id: 'vencidos',
+        icone: AlertTriangle,
+        texto: (
+          <>
+            {vencidos.length} conta(s) vencida(s) ·{' '}
+            {formatCurrency(vencidos.reduce((s, v) => s + v.valor, 0))}
+          </>
+        ),
+        to: '/custos-fixos',
+        grave: true,
+      })
+    }
+    for (const c of cartoes) {
+      const vencimento = c.faturaAberta.vencimentoEstimado
+      if (!vencimento || vencimento > somarDias(hoje, DIAS_AVISO_FATURA)) continue
+      lista.push({
+        id: `fatura-${c.id}`,
+        icone: CreditCard,
+        texto: (
+          <>
+            Fatura {c.banco} vence ~{formatDate(vencimento).slice(0, 5)} ·{' '}
+            {formatCurrency(c.faturaAberta.total)}
+          </>
+        ),
+        to: '/cartao',
+        grave: false,
+      })
+    }
+    for (const o of orcamentosEstourados(orcamentos, despesas, mesHoje)) {
+      lista.push({
+        id: `orc-${o.nome}`,
+        icone: PiggyBank,
+        texto: (
+          <>
+            {nomeBonito(o.nome)} em {o.percentual.toFixed(0)}% do orçamento
+          </>
+        ),
+        to: '/orcamentos',
+        grave: false,
+      })
+    }
+    if (pendentes.length > 0) {
+      lista.push({
+        id: 'pluggy',
+        icone: Landmark,
+        texto: <>{pendentes.length} transação(ões) para conciliar</>,
+        to: '/bancos',
+        grave: false,
+      })
+    }
+    return lista
+  }, [caixa.origemSaldo, projecao, vencimentos, cartoes, orcamentos, despesas, mesHoje, pendentes, hoje])
 
   const reservas = useMemo(
     () =>
@@ -242,360 +311,225 @@ export function Dashboard() {
     [contas, metas]
   )
 
-  const mesAnterior = somarMeses(`${periodo}-01`, -1).slice(0, 7)
-  const proximoMes = somarMeses(`${periodo}-01`, 1).slice(0, 7)
+  // --- modais de detalhe ---
+  function abrirCaixa(qual: CliqueCaixa) {
+    switch (qual) {
+      case 'saldo':
+        return setDetalhe(detalheSaldoContas(caixa, hoje, cores.income))
+      case 'entradas':
+        return setDetalhe(detalheEntradasPrevistas(caixa, cores.income))
+      case 'fatura':
+        return setDetalhe(detalheFatura(cartoes, cores.brand))
+      case 'parcelas':
+        return setDetalhe({
+          ...detalheAPagar(caixa.parcelas, cores.serieDespesa),
+          titulo: 'Parcelas de dívidas',
+          subtitulo: 'O que vence neste mês e o que ficou atrasado',
+          divisao: undefined,
+        })
+      case 'fixos':
+        return setDetalhe({
+          ...detalheAPagar(caixa.fixos, cores.composicao[2]),
+          titulo: 'Custos fixos do mês',
+          subtitulo: 'Ainda sem pagamento registrado',
+          divisao: undefined,
+        })
+      case 'sobra':
+        return setDetalhe(detalheSobraDoMes(caixa, caixa.sobra < 0 ? cores.expense : cores.income))
+    }
+  }
+
+  function abrirOrcamento(l: LinhaOrcamento) {
+    const titulo = l.subcategoria ? `${l.categoria} / ${l.subcategoria}` : l.categoria
+    const totalSaiu = despesas
+      .filter((d) => d.data.slice(0, 7) === periodo)
+      .reduce((s, d) => s + d.valor, 0)
+    setDetalhe({
+      ...detalheDespesas({
+        titulo,
+        cor: cores.brand,
+        despesas,
+        periodo,
+        filtro: (d) =>
+          d.categoria === l.categoria && (!l.subcategoria || d.subcategoria === l.subcategoria),
+        agruparPor: (d) => d.subcategoria || 'Sem subcategoria',
+        divisaoTitulo: 'Por subcategoria',
+        totalSaiu,
+      }),
+      subtitulo:
+        l.resta >= 0
+          ? `Orçamento de ${formatCurrency(l.orcado)} · restam ${formatCurrency(l.resta)}`
+          : `Orçamento de ${formatCurrency(l.orcado)} · ${formatCurrency(-l.resta)} acima`,
+    })
+  }
+
+  const navegacaoMes = (
+    <div className="flex items-center rounded-xl border border-line bg-surface-2/60 p-0.5">
+      <button
+        onClick={() => setPeriodo(somarMeses(`${periodo}-01`, -1).slice(0, 7))}
+        aria-label="Mês anterior"
+        className="rounded-lg p-1 text-ink-faint hover:bg-surface hover:text-ink"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </button>
+      <span className="px-2 text-xs font-semibold text-ink min-w-[104px] text-center">
+        {labelPeriodo(periodo)}
+      </span>
+      <button
+        onClick={() => setPeriodo(somarMeses(`${periodo}-01`, 1).slice(0, 7))}
+        aria-label="Próximo mês"
+        className="rounded-lg p-1 text-ink-faint hover:bg-surface hover:text-ink"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </button>
+    </div>
+  )
 
   return (
     <>
-      <PageHeader title="Dashboard" subtitle="Visão consolidada da sua vida financeira" />
-
-      <div className="flex flex-wrap items-center gap-2 mb-6">
-        <div className="flex items-center rounded-xl border border-line bg-surface p-1 shadow-sm shadow-slate-900/[0.02]">
-          <button
-            onClick={() => setPeriodo(mesAnterior)}
-            aria-label="Mês anterior"
-            className="rounded-lg p-1.5 text-ink-faint hover:bg-surface-2 hover:text-ink-soft"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <span className="px-3 text-sm font-semibold text-ink min-w-[110px] text-center">
-            {labelPeriodo(periodo)}
-          </span>
-          <button
-            onClick={() => setPeriodo(proximoMes)}
-            aria-label="Próximo mês"
-            className="rounded-lg p-1.5 text-ink-faint hover:bg-surface-2 hover:text-ink-soft"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
-        <input
-          type="month"
-          value={periodo}
-          onChange={(e) => e.target.value && setPeriodo(e.target.value)}
-          className="rounded-xl border border-line bg-surface px-3 py-2 text-sm text-ink-muted shadow-sm shadow-slate-900/[0.02]"
-        />
-      </div>
-
-      <div className="lg:grid lg:grid-cols-[360px_1fr] lg:gap-4 lg:items-start">
-        <div className="space-y-3">
-          <div className="rounded-2xl border border-line bg-gradient-to-br from-brand-soft/50 via-surface to-surface p-7 shadow-xl shadow-brand/[0.08]">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
-              Dinheiro disponível
-            </p>
-            <p className="text-[3.75rem] leading-[0.95] font-extrabold text-ink tracking-tighter mt-3 truncate">
-              {(() => {
-                const [inteiro, centavos] = splitMoeda(formatCurrency(dinheiroDisponivel))
-                return (
-                  <>
-                    {inteiro}
-                    {centavos && <span className="text-ink-faint text-[2.5rem]">,{centavos}</span>}
-                  </>
-                )
-              })()}
-            </p>
-            {ehMesAtual && diasRestantesMes && (
-              <div className="h-1.5 rounded-full bg-surface-2 mt-5 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-brand to-income"
-                  style={{
-                    width: `${Math.min(100, ((30 - diasRestantesMes + 1) / 30) * 100)}%`,
-                  }}
-                />
-              </div>
-            )}
-            <p className="text-xs text-ink-muted mt-2.5">
-              {!contaAutomatica
-                ? 'Crie uma conta do tipo Automática em Contas pra este número funcionar'
-                : valorDisponivelPorDia !== null
-                  ? `${formatCurrency(valorDisponivelPorDia)}/dia até o fim do mês · ${diasRestantesMes} dias restam`
-                  : ehMesAtual && dinheiroDisponivel <= 0
-                    ? 'Sem saldo disponível pro resto do mês'
-                    : 'Saldo total da conta automática'}
-            </p>
-          </div>
-
-          {contas.filter((c) => c.ativa).length > 0 && (
-            <div className="rounded-2xl border border-line bg-surface p-4 shadow-lg shadow-black/30">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
-                Contas
-              </span>
-              <div className="mt-2">
-                {contas
-                  .filter((c) => c.ativa)
-                  .map((c) => (
-                    <div key={c.id} className="flex items-center gap-2.5 py-1.5">
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-[11px] font-bold text-brand">
-                        {c.nome[0]?.toUpperCase()}
-                      </span>
-                      <p className="text-sm text-ink-soft truncate flex-1 min-w-0">{c.nome}</p>
-                      <p className="text-sm font-semibold text-ink shrink-0">
-                        {formatCurrency(calcularSaldo(c, dadosSaldo))}
-                      </p>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-3 mt-3 lg:mt-0">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <CardIndicador
-              titulo="Total em contas"
-              valor={formatCurrency(totalEmContas)}
-              icone={Scale}
-              cor="text-ink-muted"
-              corFundo="bg-surface-2"
-              accent="neutral"
-            />
-            <CardIndicador
-              titulo="Entradas do período"
-              valor={formatCurrency(entradasDoPeriodo)}
-              icone={ArrowDownToLine}
-              cor="text-income"
-              corFundo="bg-income-soft"
-              accent="income"
-              nota={
-                entradasPrevistasDoPeriodo > 0
-                  ? `+ ${formatCurrency(entradasPrevistasDoPeriodo)} previstas`
-                  : undefined
-              }
-            />
-            <CardIndicador
-              titulo="Despesas do período"
-              valor={formatCurrency(despesasDoPeriodo)}
-              icone={Receipt}
-              cor="text-expense"
-              corFundo="bg-expense-soft"
-              accent="expense"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <CardBase eyebrow="Resultado do período" accent={resultado >= 0 ? 'income' : 'expense'}>
-              <div className="flex items-center gap-2 mt-2">
-                {resultado >= 0 ? (
-                  <TrendingUp className="h-4 w-4 text-income" />
-                ) : (
-                  <TrendingDown className="h-4 w-4 text-expense" />
-                )}
-                <p
-                  className={`text-2xl font-bold tracking-tight ${
-                    resultado >= 0 ? 'text-income' : 'text-expense'
-                  }`}
-                >
-                  {resultado >= 0 ? '+' : ''}
-                  {formatCurrency(resultado)}
-                </p>
-              </div>
-            </CardBase>
-
-            <CardBase eyebrow="Compromissos futuros" className="sm:col-span-2">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mt-4">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl bg-surface-2 ring-1 ring-inset ring-white/5">
-                    <Repeat className="h-[18px] w-[18px] text-ink-muted" />
-                  </span>
-                  <div className="min-w-0 flex-1 flex items-center justify-between sm:block gap-2">
-                    <p className="text-[11px] text-ink-faint truncate">Custos fixos</p>
-                    <p className="text-base sm:text-lg font-bold text-ink truncate">
-                      {formatCurrency(custosFixosDoPeriodo)}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 pt-3 sm:pt-0 border-t sm:border-t-0 sm:border-l border-line-soft sm:pl-4">
-                  <span className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl bg-surface-2 ring-1 ring-inset ring-white/5">
-                    <CreditCard className="h-[18px] w-[18px] text-ink-muted" />
-                  </span>
-                  <div className="min-w-0 flex-1 flex items-center justify-between sm:block gap-2">
-                    <p className="text-[11px] text-ink-faint truncate">Parcelas</p>
-                    <p className="text-base sm:text-lg font-bold text-ink truncate">
-                      {formatCurrency(parcelasDoPeriodo)}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between sm:block gap-2 pt-3 sm:pt-0 border-t sm:border-t-0 sm:border-l border-line-soft sm:pl-4">
-                  <p className="text-[11px] text-ink-faint truncate">Total comprometido</p>
-                  <p className="text-base sm:text-lg font-bold text-brand truncate">
-                    {formatCurrency(totalComprometido)}
-                  </p>
-                </div>
-              </div>
-            </CardBase>
-          </div>
-
-          <CardBase eyebrow="Entradas vs. despesas">
-            <EntradasDespesasChart entradas={entradas} despesas={despesas} periodo={periodo} />
-          </CardBase>
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm shadow-slate-900/[0.02] mt-3">
-        <div className="flex items-center justify-between flex-wrap gap-3 mb-1">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
-            Evolução do comprometimento mensal
-          </span>
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <label className="text-xs text-ink-muted">De</label>
-            <input
-              type="month"
-              value={mesInicialComprometido}
-              max={mesFinalComprometido}
-              onChange={(e) => e.target.value && setMesInicialComprometido(e.target.value)}
-              className="min-w-0 rounded-lg border border-line px-2.5 py-1.5 text-sm text-ink-soft"
-            />
-            <label className="text-xs text-ink-muted">até</label>
-            <input
-              type="month"
-              value={mesFinalComprometido}
-              min={mesInicialComprometido}
-              onChange={(e) => e.target.value && setMesFinalComprometido(e.target.value)}
-              className="min-w-0 rounded-lg border border-line px-2.5 py-1.5 text-sm text-ink-soft"
-            />
-          </div>
-        </div>
-        <p className="text-xs text-ink-faint mb-2">
-          Custos fixos e parcelas de dívidas somados, mês a mês
-        </p>
-        <ComprometimentoMensalChart
-          custosFixos={custosFixos}
-          pagamentosCustosFixos={pagamentosCustosFixos}
-          parcelas={parcelas}
-          mesInicial={mesInicialComprometido}
-          mesFinal={mesFinalComprometido}
-        />
-      </div>
-
-      <div className="mt-3">
-        <CardBase eyebrow={`Despesas por categoria — ${labelPeriodo(periodo)}`}>
-          <div className="mt-2">
-            <DespesasPorCategoriaChart
-              despesas={despesasFiltradas}
-              categoriaSelecionada={categoriaSelecionada}
-              onCategoriaClick={(cat) =>
-                setCategoriaSelecionada((atual) => (atual === cat ? null : cat))
-              }
-            />
-          </div>
-
-          <div className="flex items-center justify-between mt-5 mb-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
-              Últimos gastos
-            </span>
-            {categoriaSelecionada && (
-              <button
-                onClick={() => setCategoriaSelecionada(null)}
-                className="flex items-center gap-1 rounded-full bg-brand-soft px-2.5 py-1 text-xs font-medium text-brand"
+      {alertas.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-5">
+          {alertas.map((a) => (
+            <Link
+              key={a.id}
+              to={a.to}
+              className="animate-surgir group flex items-center gap-2.5 rounded-full border border-line bg-surface py-1.5 pl-1.5 pr-3.5 text-xs font-medium shadow-card transition-all hover:-translate-y-px hover:border-line hover:shadow-md"
+            >
+              <span
+                className={`relative flex h-6 w-6 items-center justify-center rounded-full ${a.grave ? 'bg-expense-soft text-expense' : 'bg-warning-soft text-warning'}`}
               >
-                {categoriaSelecionada}
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
-
-          {despesasDaTabela.length === 0 ? (
-            <p className="text-sm text-ink-faint py-6 text-center">Nenhuma despesa encontrada.</p>
-          ) : (
-            <div className="max-h-72 overflow-y-auto rounded-xl border border-line-soft">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-surface-2">
-                  <tr className="text-left text-ink-faint">
-                    <th className="px-3 py-2 font-medium">
-                      <button
-                        onClick={() => alternarOrdenacaoTabela('data')}
-                        className="flex items-center gap-1 hover:text-ink"
-                      >
-                        Data
-                        <ArrowUpDown className="h-3.5 w-3.5" />
-                      </button>
-                    </th>
-                    <th className="px-3 py-2 font-medium">Descrição</th>
-                    <th className="px-3 py-2 font-medium">Categoria</th>
-                    <th className="px-3 py-2 font-medium">Subcategoria</th>
-                    <th className="px-3 py-2 font-medium text-right">
-                      <button
-                        onClick={() => alternarOrdenacaoTabela('valor')}
-                        className="flex items-center gap-1 hover:text-ink ml-auto"
-                      >
-                        Valor
-                        <ArrowUpDown className="h-3.5 w-3.5" />
-                      </button>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {despesasDaTabela.map((d) => (
-                    <tr key={d.id} className="border-t border-line-soft">
-                      <td className="px-3 py-2 whitespace-nowrap text-ink-soft">
-                        {formatDate(d.data)}
-                      </td>
-                      <td className="px-3 py-2 text-ink truncate max-w-[160px]">{d.descricao}</td>
-                      <td className="px-3 py-2 text-ink-muted whitespace-nowrap">{d.categoria}</td>
-                      <td className="px-3 py-2 text-ink-muted whitespace-nowrap">
-                        {d.subcategoria}
-                      </td>
-                      <td className="px-3 py-2 text-right font-medium text-ink whitespace-nowrap">
-                        {formatCurrency(d.valor)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardBase>
-      </div>
-
-      <div className="mt-3">
-        <CardBase eyebrow="Gasto médio por dia da semana — Lazer e Alimentação">
-          <div className="mt-2">
-            <GastoPorDiaSemanaChart despesas={despesas} />
-          </div>
-        </CardBase>
-      </div>
-
-      {reservas.length > 0 && (
-        <div className="mt-6">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
-            Reserva de emergência
-          </span>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2.5">
-            {reservas.map(({ conta, meta }) => {
-              const saldo = calcularSaldo(conta, dadosSaldo)
-              const percentual = meta && meta.valorMeta > 0 ? (saldo / meta.valorMeta) * 100 : 0
-              return (
-                <div
-                  key={conta.id}
-                  className="rounded-2xl border border-line bg-surface p-5 shadow-sm shadow-slate-900/[0.02]"
-                >
-                  <div className="flex items-center gap-2 text-ink-muted">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-soft">
-                      <Target className="h-4 w-4 text-brand" strokeWidth={2.1} />
-                    </span>
-                    <span className="text-sm font-semibold text-ink-soft">{conta.nome}</span>
-                  </div>
-                  <p className="text-xl font-bold text-ink mt-3 tracking-tight">
-                    {formatCurrency(saldo)}{' '}
-                    <span className="text-xs font-normal text-ink-faint">
-                      de {formatCurrency(meta!.valorMeta)}
-                    </span>
-                  </p>
-                  <div className="h-2 rounded-full bg-surface-2 mt-2.5 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-brand"
-                      style={{ width: `${Math.min(percentual, 100)}%` }}
-                    />
-                  </div>
-                  <p className="text-xs text-brand font-semibold mt-1.5">
-                    {percentual.toFixed(0)}% da meta
-                  </p>
-                </div>
-              )
-            })}
-          </div>
+                <a.icone className="h-3.5 w-3.5" />
+                {a.grave && (
+                  <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-expense ring-2 ring-surface" />
+                )}
+              </span>
+              <span className="text-ink-soft">{a.texto}</span>
+              <ArrowUpRight className="h-3.5 w-3.5 text-ink-faint transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-ink" />
+            </Link>
+          ))}
         </div>
       )}
+
+      <div className="space-y-4">
+        <PainelCaixa
+          caixa={caixa}
+          hoje={hoje}
+          carregando={carregandoCaixa}
+          avisos={avisosCaixa}
+          onClique={abrirCaixa}
+        />
+
+        <PainelOrcamentos
+          resumo={resumoOrcamentos}
+          sobraDoMes={
+            periodo === mesHoje && !carregandoCaixa && caixa.contas.length > 0 ? caixa.sobra : null
+          }
+          comprasNaFila={comprasNaFila}
+          navegacaoMes={navegacaoMes}
+          onSelecionar={abrirOrcamento}
+        />
+
+        <section
+          style={{ animationDelay: '120ms' }}
+          className="animate-surgir rounded-2xl border border-line bg-surface p-5 shadow-card dark:shadow-[inset_0_1px_0_0_rgb(255_255_255/0.04)]"
+        >
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
+                <CalendarDays className="h-4 w-4" strokeWidth={2.1} />
+              </span>
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-ink">Calendário de {labelPeriodo(periodo)}</h3>
+                <p className="text-xs text-ink-faint mt-0.5">
+                  Clique num dia para ver o saldo e o que aconteceu nele
+                </p>
+              </div>
+            </div>
+            {navegacaoMes}
+          </div>
+          <CalendarioMes
+            periodo={periodo}
+            hoje={hoje}
+            despesas={despesas}
+            entradas={entradas}
+            movimentacoes={movimentacoes}
+            vencimentos={vencimentosDoPeriodo}
+            contaAutomatica={contaAutomatica}
+            grupos={gruposCalendario}
+            grupoDe={grupoDe}
+          />
+        </section>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+          {temBanco && (
+            <div className={reservas.length > 0 ? 'lg:col-span-5' : 'lg:col-span-8'}>
+              <CardsBancos bancos={bancos} carregando={carregandoBancos} erro={erroBancos} />
+            </div>
+          )}
+
+          {reservas.length > 0 && (
+            <div className={temBanco ? 'lg:col-span-4' : 'lg:col-span-8'}>
+              <h3 className="mb-3 px-1 pt-1 text-sm font-semibold text-ink">Reservas</h3>
+              <div className="space-y-3">
+                {reservas.map(({ conta, meta }) => {
+                  const saldo = calcularSaldo(conta, dadosSaldo)
+                  const percentual = meta && meta.valorMeta > 0 ? (saldo / meta.valorMeta) * 100 : 0
+                  return (
+                    <div
+                      key={conta.id}
+                      className="rounded-2xl border border-line bg-surface p-5 shadow-card"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-soft">
+                          <Target className="h-4 w-4 text-brand" strokeWidth={2.1} />
+                        </span>
+                        <span className="text-sm font-semibold text-ink">{conta.nome}</span>
+                        <span className="ml-auto text-xs font-semibold text-brand">
+                          {percentual.toFixed(0)}%
+                        </span>
+                      </div>
+                      <p className="text-xl font-semibold text-ink mt-3 tracking-tight">
+                        {formatCurrency(saldo)}{' '}
+                        <span className="text-xs font-normal text-ink-faint">
+                          de {formatCurrency(meta!.valorMeta)}
+                        </span>
+                      </p>
+                      <div className="h-2 rounded-full bg-brand-soft mt-2.5 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-brand"
+                          style={{ width: `${Math.min(percentual, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          <Link
+            to="/analise"
+            className={`group flex items-center gap-3 rounded-2xl border border-line bg-surface p-5 shadow-card transition-all hover:-translate-y-0.5 hover:shadow-pop ${
+              temBanco && reservas.length > 0
+                ? 'lg:col-span-3'
+                : temBanco || reservas.length > 0
+                  ? 'lg:col-span-4'
+                  : 'lg:col-span-12'
+            }`}
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
+              <PieChart className="h-5 w-5" strokeWidth={2.1} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-ink">Ver análise</span>
+              <span className="block text-xs text-ink-faint">Para onde foi, ritmo e projeção</span>
+            </span>
+            <ArrowUpRight className="h-4 w-4 shrink-0 text-ink-faint transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+          </Link>
+        </div>
+      </div>
+
+      {detalhe && <ModalDetalhe detalhe={detalhe} onClose={() => setDetalhe(null)} />}
     </>
   )
 }

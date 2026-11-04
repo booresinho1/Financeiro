@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import logo from '@/assets/logo.png'
+import { Logo } from '@/components/shared/Logo'
 
 export function RedefinirSenha() {
   const { atualizarSenha, cancelarRecuperacao } = useAuth()
@@ -32,7 +32,7 @@ export function RedefinirSenha() {
     <div className="min-h-screen flex items-center justify-center bg-app px-4">
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-2.5 justify-center mb-8">
-          <img src={logo} alt="Financeiro" className="h-10 w-10 rounded-xl shadow-sm shadow-black/20" />
+          <Logo tamanho={40} />
           <span className="text-xl font-bold tracking-tight text-ink">Financeiro</span>
         </div>
 

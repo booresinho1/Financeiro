@@ -1,20 +1,43 @@
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 
 interface ModalProps {
   title: string
+  subtitle?: string
   onClose: () => void
   children: ReactNode
+  size?: 'md' | 'lg'
 }
 
-export function Modal({ title, onClose, children }: ModalProps) {
+const LARGURA = {
+  md: 'sm:max-w-md',
+  lg: 'sm:max-w-2xl',
+}
+
+export function Modal({ title, subtitle, onClose, children, size = 'md' }: ModalProps) {
+  useEffect(() => {
+    function aoTeclar(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', aoTeclar)
+    return () => window.removeEventListener('keydown', aoTeclar)
+  }, [onClose])
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50 backdrop-blur-[2px] p-0 sm:p-4">
+    <div className="animate-escurecer fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/55 backdrop-blur-sm p-0 sm:p-4">
       <button aria-label="Fechar" className="absolute inset-0" onClick={onClose} />
 
-      <div className="relative w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-surface p-6 max-h-[90vh] overflow-y-auto shadow-2xl shadow-slate-900/20 ring-1 ring-slate-900/5">
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-lg font-bold tracking-tight text-ink">{title}</h3>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className={`animate-aparecer relative w-full ${LARGURA[size]} rounded-t-3xl sm:rounded-3xl bg-surface p-6 max-h-[90vh] overflow-y-auto shadow-2xl shadow-slate-900/25 ring-1 ring-line`}
+      >
+        <div className="flex items-start justify-between gap-3 mb-5">
+          <div className="min-w-0">
+            <h3 className="text-lg font-bold tracking-tight text-ink">{title}</h3>
+            {subtitle && <p className="mt-0.5 text-[13px] text-ink-faint">{subtitle}</p>}
+          </div>
           <button
             aria-label="Fechar"
             onClick={onClose}

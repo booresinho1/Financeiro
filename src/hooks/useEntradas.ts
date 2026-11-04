@@ -27,6 +27,7 @@ export function useEntradas() {
   const criar = useCallback(async (dados: NovaEntrada) => {
     const criada = await entradasRepository.criar(dados)
     setEntradas((atual) => [criada, ...atual])
+    return criada
   }, [])
 
   const atualizar = useCallback(async (id: string, dados: NovaEntrada) => {

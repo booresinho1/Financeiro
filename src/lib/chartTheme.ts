@@ -5,35 +5,50 @@ export interface ChartColors {
   inkMuted: string
   inkPrimary: string
   cursorFill: string
+  surface: string
   brand: string
   brandSoft: string
   income: string
   expense: string
   custoFixo: string
+  serieEntrada: string
+  serieDespesa: string
+  /** custos fixos, parcelas e as 3 maiores categorias, nessa ordem (validada lado a lado) */
+  composicao: [string, string, string, string, string]
 }
 
+// Par de séries (entrada × despesa, e qualquer gráfico de 2 séries) validado com o
+// validate_palette.js da skill dataviz: passa CVD/contraste no claro (#fff) e no escuro (#12141a).
 const LIGHT: ChartColors = {
-  grid: '#e5e2d8',
-  inkMuted: '#9c9a92',
-  inkPrimary: '#1c1c1a',
-  cursorFill: 'rgba(28,28,26,0.04)',
-  brand: '#c9a227',
-  brandSoft: '#e9d38f',
-  income: '#2e9b68',
-  expense: '#d65c5c',
-  custoFixo: '#2a78d6',
+  grid: '#eceef3',
+  inkMuted: '#8e95a5',
+  inkPrimary: '#0c0e14',
+  cursorFill: 'rgba(91,76,240,0.06)',
+  surface: '#ffffff',
+  brand: '#6d5efc',
+  brandSoft: '#d9d4ff',
+  income: '#12a150',
+  expense: '#e5484d',
+  custoFixo: '#f2683c',
+  serieEntrada: '#6d5efc',
+  serieDespesa: '#f2683c',
+  composicao: ['#6d5efc', '#f2683c', '#2a78d6', '#eda100', '#e87ba4'],
 }
 
 const DARK: ChartColors = {
-  grid: '#35342f',
-  inkMuted: '#a9a79f',
-  inkPrimary: '#f5f5f2',
-  cursorFill: 'rgba(245,245,242,0.06)',
-  brand: '#d4af37',
-  brandSoft: '#7a672a',
-  income: '#33c481',
-  expense: '#ff6b6b',
-  custoFixo: '#5b9bd8',
+  grid: '#1f232d',
+  inkMuted: '#8b93a5',
+  inkPrimary: '#f2f4f8',
+  cursorFill: 'rgba(139,128,255,0.08)',
+  surface: '#12141a',
+  brand: '#8b80ff',
+  brandSoft: '#3a3470',
+  income: '#3ddc84',
+  expense: '#ff6369',
+  custoFixo: '#e8643c',
+  serieEntrada: '#8b80ff',
+  serieDespesa: '#e8643c',
+  composicao: ['#8b80ff', '#e8643c', '#3987e5', '#c98500', '#d55181'],
 }
 
 export function useChartColors(): ChartColors {

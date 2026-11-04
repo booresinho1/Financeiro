@@ -1,7 +1,14 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { MoreHorizontal, X, LogOut, Plus } from 'lucide-react'
-import { mobilePrimaryNavItems, navItems, EMAIL_MASTER } from '@/lib/navigation'
+import { LayoutGrid, X, LogOut, Plus } from 'lucide-react'
+import { IconeNav } from '@/components/layout/IconeNav'
+import {
+  mobilePrimaryNavItems,
+  navItems,
+  EMAIL_MASTER,
+  NOME_GRUPO,
+  ORDEM_GRUPOS,
+} from '@/lib/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 
 interface BottomNavProps {
@@ -26,7 +33,7 @@ export function BottomNav({ onNovaDespesa }: BottomNavProps) {
             className="flex-1"
             onClick={() => setMoreOpen(false)}
           />
-          <div className="rounded-t-2xl bg-surface p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+          <div className="sem-barra max-h-[85vh] overflow-y-auto rounded-t-3xl bg-surface p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
             <div className="flex items-center justify-between mb-3">
               <span className="font-semibold text-ink">Mais opções</span>
               <button
@@ -37,31 +44,48 @@ export function BottomNav({ onNovaDespesa }: BottomNavProps) {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              {overflowItems.map(({ to, label, icon: Icon }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  onClick={() => setMoreOpen(false)}
-                  className={({ isActive }) =>
-                    [
-                      'flex items-center gap-2 rounded-lg px-3 py-3 text-sm font-medium',
-                      isActive
-                        ? 'bg-brand-soft text-brand'
-                        : 'bg-surface-2 text-ink-soft',
-                    ].join(' ')
-                  }
-                >
-                  <Icon className="h-5 w-5 shrink-0" />
-                  {label}
-                </NavLink>
-              ))}
+            <div className="space-y-4">
+              {ORDEM_GRUPOS.map((grupo) => {
+                const itensDoGrupo = overflowItems.filter((item) => item.grupo === grupo)
+                if (itensDoGrupo.length === 0) return null
+                return (
+                  <div key={grupo}>
+                    <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-ink-faint">
+                      {NOME_GRUPO[grupo]}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {itensDoGrupo.map((item) => (
+                        <NavLink
+                          key={item.to}
+                          to={item.to}
+                          onClick={() => setMoreOpen(false)}
+                          className={({ isActive }) =>
+                            [
+                              'flex min-w-0 items-center gap-2.5 rounded-2xl p-2 text-sm font-medium',
+                              isActive
+                                ? 'bg-brand-soft font-semibold text-brand'
+                                : 'bg-surface-2/60 text-ink-soft',
+                            ].join(' ')
+                          }
+                        >
+                          {({ isActive }) => (
+                            <>
+                              <IconeNav item={item} ativo={isActive} tamanho="md" />
+                              <span className="min-w-0 truncate">{item.label}</span>
+                            </>
+                          )}
+                        </NavLink>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
             <button
               onClick={sair}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-3 mt-2 text-sm font-medium bg-surface-2 text-ink-soft"
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-line px-3 py-3 text-sm font-medium text-ink-muted"
             >
-              <LogOut className="h-5 w-5 shrink-0" />
+              <LogOut className="h-[18px] w-[18px] shrink-0" />
               Sair
             </button>
           </div>
@@ -118,7 +142,7 @@ export function BottomNav({ onNovaDespesa }: BottomNavProps) {
             onClick={() => setMoreOpen(true)}
             className="flex flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-medium text-ink-muted"
           >
-            <MoreHorizontal className="h-5 w-5" />
+            <LayoutGrid className="h-5 w-5" />
             Mais
           </button>
         </div>
