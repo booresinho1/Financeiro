@@ -377,7 +377,6 @@ export function Dashboard() {
 
       <div className="space-y-4">
         <CabecalhoDre mes={periodo} onMes={setPeriodo} d={dreMes} />
-        <FluxoDoMes mes={periodo} d={dreMes} />
 
         <PainelOrcamentos
           resumo={resumoOrcamentos}
@@ -388,6 +387,8 @@ export function Dashboard() {
           navegacaoMes={navegacaoMes}
           onSelecionar={abrirOrcamento}
         />
+
+        <FluxoDoMes mes={periodo} d={dreMes} />
 
         <section
           style={{ animationDelay: '120ms' }}

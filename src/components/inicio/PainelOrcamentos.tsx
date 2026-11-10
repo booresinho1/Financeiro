@@ -43,9 +43,9 @@ function LinhaCategoria({
     <button
       type="button"
       onClick={onClick}
-      className="group grid w-full grid-cols-[minmax(0,130px)_1fr_auto] items-center gap-3 border-b border-line-soft px-1 py-2 text-left transition-colors hover:bg-surface-2/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand sm:grid-cols-[132px_1fr_124px] sm:gap-3"
+      className="group grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 border-b border-line-soft px-1 py-2.5 text-left transition-colors hover:bg-surface-2/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand sm:grid-cols-[132px_1fr_124px] sm:py-2"
     >
-      <span className="flex min-w-0 items-center gap-2">
+      <span className="order-1 flex min-w-0 items-center gap-2">
         <span className="text-lg leading-none" aria-hidden>
           {emojiDaCategoria(linha.subcategoria || linha.categoria)}
         </span>
@@ -57,7 +57,7 @@ function LinhaCategoria({
         </span>
       </span>
 
-      <span className="block">
+      <span className="order-3 col-span-2 block sm:order-2 sm:col-span-1">
         <span className="relative block h-3 overflow-hidden rounded-full bg-ink/[0.06] dark:bg-white/[0.07]">
           {projecao !== null && (
             <span
@@ -90,7 +90,7 @@ function LinhaCategoria({
         </span>
       </span>
 
-      <span className="text-right leading-tight">
+      <span className="order-2 text-right leading-tight sm:order-3">
         <span className={`block whitespace-nowrap text-[15px] font-extrabold tracking-tight tabular-nums ${semGasto ? 'text-ink-soft' : estilo.texto}`}>
           {linha.resta < 0 ? '+' : ''}
           {formatCurrency(Math.abs(linha.resta))}
