@@ -1,4 +1,4 @@
-import type { TransacaoPendente } from '@/types/finance'
+import type { Divida, Parcela, TransacaoPendente } from '@/types/finance'
 
 /** Despesa ou entrada do app que pode ser a mesma coisa que a transação do banco. */
 export interface Lancamento {
@@ -59,4 +59,37 @@ export function sugerirConciliacao(
 /** Só dá para conciliar em lote quando não há dúvida: uma sugestão só, de valor exato. */
 export function sugestaoUnica(sugestoes: Sugestao[]): Sugestao | null {
   return sugestoes.length === 1 && sugestoes[0].modo === 'exato' ? sugestoes[0] : null
+}
+
+export interface SugestaoParcela {
+  parcela: Parcela
+  divida: Divida
+  /** dias entre o pagamento e o vencimento (negativo: pagou antes) */
+  dias: number
+  /** pago menos previsto: positivo costuma ser juros de atraso */
+  diferenca: number
+}
+
+const ANTES_DO_VENCIMENTO = 15
+const DEPOIS_DO_VENCIMENTO = 25
+
+/**
+ * Parcela de dívida lançada à mão (carnê, boleto) que este débito parece pagar: valor da parcela
+ * (aceita até 10% a mais, de juros) e data perto do vencimento. A mais próxima vem primeiro.
+ */
+export function sugerirParcela(t: TransacaoPendente, parcelas: Parcela[], dividas: Divida[]): SugestaoParcela[] {
+  if (t.tipo !== 'DESPESA') return []
+  const sugestoes: SugestaoParcela[] = []
+  for (const p of parcelas) {
+    if (p.status !== 'PENDENTE' && p.status !== 'ATRASADA') continue
+    const divida = dividas.find((d) => d.id === p.idDivida)
+    if (!divida) continue
+    const diferenca = t.valor - p.valorPrevisto
+    if (diferenca < -Math.max(CENTAVO, p.valorPrevisto * 0.01) || diferenca > p.valorPrevisto * 0.1) continue
+    const dia = (iso: string) => Date.parse(`${iso.slice(0, 10)}T00:00:00Z`) / 86_400_000
+    const dias = dia(t.data) - dia(p.dataVencimento)
+    if (dias < -ANTES_DO_VENCIMENTO || dias > DEPOIS_DO_VENCIMENTO) continue
+    sugestoes.push({ parcela: p, divida, dias, diferenca })
+  }
+  return sugestoes.sort((a, b) => Math.abs(a.diferenca) - Math.abs(b.diferenca) || Math.abs(a.dias) - Math.abs(b.dias)).slice(0, 2)
 }

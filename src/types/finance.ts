@@ -170,6 +170,8 @@ export interface ParcelaCartao {
   restantes: number
   valorRestante: number
   dataCompra: string | null
+  /** 1 quando a parcela atual já está na fatura aberta; 0 quando a próxima cai nela */
+  primeiraFaturaRestante: number
 }
 
 export interface CartaoResumo {
@@ -188,6 +190,9 @@ export interface CartaoResumo {
     lancado: number
     parcelasPrevistas: number
     total: number
+    /** pago adiantado, antes de a fatura fechar */
+    pago: number
+    pagoEm: string | null
     compras: CompraCartao[]
   }
   ultimaFatura: {

@@ -1,4 +1,4 @@
-const EMOJI_PADRAO = '🏷️'
+export const EMOJI_PADRAO = '🏷️'
 
 // o primeiro que casar vale; os nomes chegam sem acento e em minúsculas
 const REGRAS: [RegExp, string][] = [

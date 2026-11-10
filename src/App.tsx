@@ -13,6 +13,7 @@ import { Dividas } from '@/pages/Dividas'
 import { Orcamentos } from '@/pages/Orcamentos'
 import { FluxoCaixa } from '@/pages/FluxoCaixa'
 import { Analise } from '@/pages/Analise'
+import { Dre } from '@/pages/Dre'
 import { Cartao } from '@/pages/Cartao'
 import { Bancos } from '@/pages/Bancos'
 import { Configuracoes } from '@/pages/Configuracoes'
@@ -53,6 +54,7 @@ function App() {
         <Route path="orcamentos" element={<Orcamentos />} />
         {user.email === EMAIL_MASTER && <Route path="fluxo-de-caixa" element={<FluxoCaixa />} />}
         <Route path="analise" element={<Analise />} />
+        <Route path="dre" element={<Dre />} />
         {user.email === EMAIL_MASTER && <Route path="cartao" element={<Cartao />} />}
         {user.email === EMAIL_MASTER && <Route path="bancos" element={<Bancos />} />}
         <Route path="configuracoes" element={<Configuracoes />} />

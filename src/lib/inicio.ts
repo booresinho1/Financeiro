@@ -121,7 +121,7 @@ interface DadosCaixa {
 /** Fatura em aberto mais o que faltou pagar da última fatura fechada. */
 export function saldoDevedorDoCartao(c: CartaoResumo): number {
   const faltaDaUltima = c.ultimaFatura ? Math.max(c.ultimaFatura.total - c.ultimaFatura.pago, 0) : 0
-  return c.faturaAberta.total + faltaDaUltima
+  return Math.max(c.faturaAberta.total - c.faturaAberta.pago, 0) + faltaDaUltima
 }
 
 function gastoDiarioDoDiaADia(
@@ -394,7 +394,8 @@ export function detalheFatura(cartoes: CartaoResumo[], cor: string): Detalhe {
   const total = cartoes.reduce((s, c) => s + saldoDevedorDoCartao(c), 0)
   const lancado = cartoes.reduce((s, c) => s + c.faturaAberta.lancado, 0)
   const previstas = cartoes.reduce((s, c) => s + c.faturaAberta.parcelasPrevistas, 0)
-  const faltaDaUltima = total - lancado - previstas
+  const pago = cartoes.reduce((s, c) => s + c.faturaAberta.pago, 0)
+  const faltaDaUltima = total - (lancado + previstas - pago)
   const vencimento = cartoes
     .map((c) => c.faturaAberta.vencimentoEstimado)
     .filter((d): d is string => !!d)
@@ -411,7 +412,9 @@ export function detalheFatura(cartoes: CartaoResumo[], cor: string): Detalhe {
       { rotulo: 'Parcelas que entram', valor: formatCurrency(previstas) },
       faltaDaUltima > 0.005
         ? { rotulo: 'Faltou da anterior', valor: formatCurrency(faltaDaUltima), tom: 'ruim' }
-        : { rotulo: 'Vence em', valor: vencimento ? rotuloData(vencimento) : '—' },
+        : pago > 0
+          ? { rotulo: 'Já pago antes', valor: formatCurrency(pago), tom: 'bom' }
+          : { rotulo: 'Vence em', valor: vencimento ? rotuloData(vencimento) : '—' },
     ],
     itens: cartoes
       .flatMap((c) => c.faturaAberta.compras)

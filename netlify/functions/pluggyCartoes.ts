@@ -1,6 +1,7 @@
 import type { Config } from '@netlify/functions'
 import { supabaseFetch } from './_lib/supabaseClient'
 import { listarContas, listarFaturas, listarTransacoes, obterItem } from './_lib/pluggyClient'
+import { ehPagamentoDeFatura } from './_lib/pluggyTransacoes'
 import { montarCartao } from './_lib/pluggyCartoes'
 import { exigirDonoDoBanco } from './_lib/acessoBanco'
 import { json, erro } from './_lib/respostas'
@@ -27,6 +28,17 @@ export default async (req: Request) => {
       itens.map(async ({ item_id }) => {
         const [item, contas] = await Promise.all([obterItem(item_id), listarContas(item_id)])
         const cartoes = contas.filter((c) => c.type === 'CREDIT')
+        // com mais de um cartão não dá para saber a qual deles pertence cada pagamento
+        const pagamentosDoBanco =
+          cartoes.length === 1
+            ? (
+                await Promise.all(
+                  contas.filter((c) => c.type === 'BANK').map((c) => listarTransacoes(c.id, desde))
+                )
+              )
+                .flat()
+                .filter(ehPagamentoDeFatura)
+            : []
         return Promise.all(
           cartoes.map(async (conta) => {
             const [faturas, transacoes] = await Promise.all([
@@ -34,7 +46,7 @@ export default async (req: Request) => {
               listarTransacoes(conta.id, desde),
             ])
             return {
-              ...montarCartao(conta, faturas, transacoes, hoje, item.connector.name),
+              ...montarCartao(conta, faturas, transacoes, hoje, item.connector.name, pagamentosDoBanco),
               atualizadoEm: item.lastUpdatedAt ?? null,
             }
           })

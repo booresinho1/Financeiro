@@ -8,9 +8,12 @@ import type {
   TransacaoPendente,
 } from '@/types/finance'
 
+const maisRecentePrimeiro = (a: TransacaoPendente, b: TransacaoPendente) => b.data.localeCompare(a.data)
+
 export function usePluggy() {
   const [itens, setItens] = useState<PluggyItem[]>([])
   const [pendentes, setPendentes] = useState<TransacaoPendente[]>([])
+  const [ignoradas, setIgnoradas] = useState<TransacaoPendente[]>([])
   const [vinculados, setVinculados] = useState<Set<string>>(new Set())
   const [contasPluggy, setContasPluggy] = useState<ContaPluggy[]>([])
   const [carregando, setCarregando] = useState(true)
@@ -26,9 +29,8 @@ export function usePluggy() {
         pluggyRepository.listarPendentes(),
       ])
       setItens(i)
-      setPendentes(
-        p.filter((t) => t.status === 'PENDENTE').sort((a, b) => b.data.localeCompare(a.data))
-      )
+      setPendentes(p.filter((t) => t.status === 'PENDENTE').sort(maisRecentePrimeiro))
+      setIgnoradas(p.filter((t) => t.status === 'IGNORADA').sort(maisRecentePrimeiro))
       setVinculados(new Set(p.flatMap((t) => separarIds(t.idLancamento))))
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Erro ao carregar dados do Pluggy')
@@ -76,6 +78,9 @@ export function usePluggy() {
     async (t: TransacaoPendente, status: StatusTransacaoPendente, idLancamento?: string) => {
       await pluggyRepository.atualizarPendente({ ...t, status, idLancamento })
       setPendentes((atual) => atual.filter((x) => x.id !== t.id))
+      if (status === 'IGNORADA') {
+        setIgnoradas((atual) => [{ ...t, status: 'IGNORADA' as const, idLancamento: null }, ...atual].sort(maisRecentePrimeiro))
+      }
       if (idLancamento) {
         setVinculados((atual) => new Set([...atual, ...separarIds(idLancamento)]))
       }
@@ -83,9 +88,20 @@ export function usePluggy() {
     []
   )
 
+  // uma a uma: se falhar no meio, o que já voltou continua na fila
+  const restaurar = useCallback(async (ts: TransacaoPendente[]) => {
+    for (const t of ts) {
+      await pluggyRepository.atualizarPendente({ ...t, status: 'PENDENTE', idLancamento: undefined })
+      setIgnoradas((atual) => atual.filter((x) => x.id !== t.id))
+      setPendentes((atual) => [{ ...t, status: 'PENDENTE' as const, idLancamento: null }, ...atual].sort(maisRecentePrimeiro))
+    }
+  }, [])
+
   return {
     itens,
     pendentes,
+    ignoradas,
+    restaurar,
     vinculados,
     contasPluggy,
     carregando,

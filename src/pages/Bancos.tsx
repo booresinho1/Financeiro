@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { Landmark, RefreshCw, Plus, Check, X, Unplug, Link2, Tags } from 'lucide-react'
+import { Landmark, RefreshCw, Plus, Check, X, Unplug, Link2, Tags, HandCoins, Sparkles } from 'lucide-react'
 import { PluggyConnect } from 'react-pluggy-connect'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -12,7 +12,11 @@ import { useEntradas } from '@/hooks/useEntradas'
 import { useContas } from '@/hooks/useContas'
 import { pluggyRepository } from '@/repositories/pluggyRepository'
 import { DivisaoTransacao } from '@/components/bancos/DivisaoTransacao'
-import { sugerirConciliacao, sugestaoUnica, type Sugestao } from '@/lib/conciliacao'
+import { TransacoesIgnoradas } from '@/components/bancos/TransacoesIgnoradas'
+import { sugerirConciliacao, sugerirParcela, sugestaoUnica, type Sugestao, type SugestaoParcela } from '@/lib/conciliacao'
+import { sugerirCategoria, type SugestaoCategoria } from '@/lib/sugestaoCategoria'
+import { useDividas } from '@/hooks/useDividas'
+import { useParcelas } from '@/hooks/useParcelas'
 import {
   despesasDaDivisao,
   erroDaDivisao,
@@ -21,7 +25,7 @@ import {
   type ParteDivisao,
 } from '@/lib/divisao'
 import { hojeIso } from '@/lib/datas'
-import { formatCurrency, formatDate } from '@/lib/format'
+import { formatCurrency, formatDate, nomeBonito } from '@/lib/format'
 import type { TransacaoPendente } from '@/types/finance'
 
 interface Classificacao {
@@ -30,6 +34,7 @@ interface Classificacao {
   conta: string
   dividir: boolean
   partes: ParteDivisao[]
+  descricao?: string
 }
 
 const TIPOS_DE_CONTA = [
@@ -41,6 +46,8 @@ export function Bancos() {
   const {
     itens,
     pendentes,
+    ignoradas,
+    restaurar,
     vinculados,
     contasPluggy,
     carregando,
@@ -54,6 +61,8 @@ export function Bancos() {
   const { despesas, criar: criarDespesa, excluir: excluirDespesa } = useDespesas()
   const { entradas, criar: criarEntrada, atualizar: atualizarEntrada } = useEntradas()
   const { contas } = useContas()
+  const { dividas } = useDividas()
+  const { parcelas, atualizar: atualizarParcela } = useParcelas()
 
   const [connectToken, setConnectToken] = useState<string | null>(null)
   const [mensagem, setMensagem] = useState<string | null>(null)
@@ -66,6 +75,50 @@ export function Bancos() {
   const [abertaId, setAbertaId] = useState<string | null>(null)
   const [conciliando, setConciliando] = useState(false)
   const [importandoId, setImportandoId] = useState<string | null>(null)
+
+  // classificação provável pelo que você já lançou do mesmo estabelecimento
+  const categoriasSugeridas = useMemo(() => {
+    const mapa = new Map<string, SugestaoCategoria>()
+    for (const t of pendentes) {
+      const s = sugerirCategoria(t, despesas, entradas)
+      if (s) mapa.set(t.id, s)
+    }
+    return mapa
+  }, [pendentes, despesas, entradas])
+
+  // débito que bate com parcela de dívida manual (carnê, boleto): pagar a parcela em um clique
+  const parcelasPorTransacao = useMemo(() => {
+    const mapa = new Map<string, SugestaoParcela[]>()
+    for (const t of pendentes) mapa.set(t.id, sugerirParcela(t, parcelas, dividas))
+    return mapa
+  }, [pendentes, parcelas, dividas])
+
+  async function pagarParcela(t: TransacaoPendente, s: SugestaoParcela) {
+    setErroLocal(null)
+    setImportandoId(t.id)
+    let idCriada: string | null = null
+    try {
+      const { parcela, divida } = s
+      const criada = await criarDespesa({
+        data: t.data,
+        descricao: `Parcela ${parcela.numeroParcela}/${divida.numParcelas} - ${divida.descricao}`,
+        valor: t.valor,
+        categoria: divida.categoria || 'DÍVIDAS/FIXOS',
+        subcategoria: divida.subcategoria || 'Parcelas',
+      })
+      idCriada = criada.id
+      const { id, ...dados } = parcela
+      await atualizarParcela(id, { ...dados, status: 'PAGA', dataPagamento: t.data, valorPago: t.valor, idDespesa: criada.id })
+      await marcar(t, 'IMPORTADA', criada.id)
+      setMensagem(`Parcela ${parcela.numeroParcela}/${divida.numParcelas} de ${divida.descricao} paga.`)
+    } catch (e) {
+      // sem desfazer, a despesa ficaria solta e uma nova tentativa lançaria de novo
+      if (idCriada) await excluirDespesa(idCriada).catch(() => {})
+      setErroLocal(e instanceof Error ? e.message : 'Erro ao pagar a parcela')
+    } finally {
+      setImportandoId(null)
+    }
+  }
 
   const sugestoesPorTransacao = useMemo(() => {
     const mapa = new Map<string, Sugestao[]>()
@@ -145,8 +198,9 @@ export function Bancos() {
     setClassificacoes((atual) => ({ ...atual, [id]: { ...classificacaoDe(id), ...parcial } }))
   }
 
-  async function importar(t: TransacaoPendente) {
-    const c = classificacaoDe(t.id)
+  async function importar(t: TransacaoPendente, pronta?: Classificacao) {
+    const c = pronta ?? classificacaoDe(t.id)
+    const descricao = c.descricao?.trim() || t.descricao
     setErroLocal(null)
     setImportandoId(t.id)
     try {
@@ -154,14 +208,14 @@ export function Bancos() {
         t.tipo === 'DESPESA'
           ? await criarDespesa({
               data: t.data,
-              descricao: t.descricao,
+              descricao,
               valor: t.valor,
               categoria: c.categoria,
               subcategoria: c.subcategoria,
             })
           : await criarEntrada({
               data: t.data,
-              descricao: t.descricao,
+              descricao,
               valor: t.valor,
               categoria: c.categoria,
               contaDestino: c.conta,
@@ -180,8 +234,12 @@ export function Bancos() {
     setErroLocal(null)
     setImportandoId(t.id)
     const criadas: string[] = []
+    const c = classificacaoDe(t.id)
     try {
-      for (const despesa of despesasDaDivisao(t, classificacaoDe(t.id).partes)) {
+      for (const despesa of despesasDaDivisao(
+        { ...t, descricao: c.descricao?.trim() || t.descricao },
+        c.partes
+      )) {
         const criada = await criarDespesa(despesa)
         criadas.push(criada.id)
       }
@@ -235,6 +293,17 @@ export function Bancos() {
     } finally {
       setConciliando(false)
     }
+  }
+
+  function comoSugerida(s: SugestaoCategoria): Classificacao {
+    return { categoria: s.categoria, subcategoria: s.subcategoria, conta: s.conta ?? '', dividir: false, partes: [] }
+  }
+
+  function abrirCategorizar(t: TransacaoPendente) {
+    const s = categoriasSugeridas.get(t.id)
+    // a sugestão já vem preenchida, mas o que você escolher à mão nunca é sobrescrito
+    if (s && !classificacoes[t.id]) setClassificacoes((atual) => ({ ...atual, [t.id]: comoSugerida(s) }))
+    setAbertaId(t.id)
   }
 
   function podeImportar(t: TransacaoPendente) {
@@ -406,6 +475,10 @@ export function Bancos() {
           {pendentes.map((t) => {
             const c = classificacaoDe(t.id)
             const sugestoes = sugestoesPorTransacao.get(t.id) ?? []
+            const sugestoesParcela = parcelasPorTransacao.get(t.id) ?? []
+            const sugCat = categoriasSugeridas.get(t.id)
+            // o selo some assim que você troca a categoria
+            const aindaSugerida = !!sugCat && c.categoria === sugCat.categoria && c.subcategoria === sugCat.subcategoria
             const aberta = abertaId === t.id
             const dividindo = c.dividir && t.tipo === 'DESPESA'
             const erroDivisao = aberta && dividindo ? erroDaDivisao(c.partes, t.valor) : null
@@ -429,6 +502,39 @@ export function Bancos() {
                     {formatCurrency(t.valor)}
                   </span>
                 </div>
+
+                {sugestoesParcela.length > 0 && (
+                  <ul className="mt-3 space-y-1.5">
+                    {sugestoesParcela.map((s) => (
+                      <li
+                        key={s.parcela.id}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-income/30 bg-income-soft/60 px-3 py-2"
+                      >
+                        <span className="flex min-w-0 items-center gap-2 text-xs text-ink-soft">
+                          <HandCoins className="h-4 w-4 shrink-0 text-income" />
+                          <span>
+                            Parece a{' '}
+                            <b className="font-semibold text-ink">
+                              parcela {s.parcela.numeroParcela}/{s.divida.numParcelas} de {s.divida.descricao}
+                            </b>{' '}
+                            · vence {formatDate(s.parcela.dataVencimento)} · {formatCurrency(s.parcela.valorPrevisto)}
+                            {s.diferenca > 0.009 && (
+                              <span className="font-semibold text-expense"> · +{formatCurrency(s.diferenca)} de juros</span>
+                            )}
+                          </span>
+                        </span>
+                        <button
+                          onClick={() => pagarParcela(t, s)}
+                          disabled={importandoId === t.id}
+                          className="flex items-center gap-1 rounded-lg bg-income px-2.5 py-1 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-60 dark:text-[#0b1a10]"
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                          {importandoId === t.id ? 'Pagando...' : 'Pagar parcela'}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
 
                 {sugestoes.length > 0 && (
                   <ul className="mt-3 space-y-1.5">
@@ -454,6 +560,58 @@ export function Bancos() {
                       </li>
                     ))}
                   </ul>
+                )}
+
+                {sugCat && !aberta && (
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand/25 bg-brand-soft/50 px-3 py-2">
+                    <span className="flex min-w-0 items-center gap-2 text-xs text-ink-soft">
+                      <Sparkles className="h-4 w-4 shrink-0 text-brand" />
+                      <span>
+                        Sugestão:{' '}
+                        <b className="font-semibold text-ink">
+                          {nomeBonito(sugCat.categoria)}
+                          {sugCat.subcategoria && ` · ${sugCat.subcategoria}`}
+                          {sugCat.conta && ` → ${sugCat.conta}`}
+                        </b>{' '}
+                        <span className="text-ink-muted">
+                          · {sugCat.vezes === 1 ? 'igual a 1 lançamento seu' : `igual a ${sugCat.vezes} lançamentos seus`}
+                          {sugCat.totalParecidos > sugCat.vezes && ` (de ${sugCat.totalParecidos} parecidos)`}
+                        </span>
+                      </span>
+                    </span>
+                    {sugCat.confianca === 'alta' && (
+                      <button
+                        onClick={() => importar(t, comoSugerida(sugCat))}
+                        disabled={importandoId === t.id}
+                        className="flex items-center gap-1 rounded-lg bg-brand px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-hover disabled:opacity-60"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                        {importandoId === t.id ? 'Importando...' : 'Importar assim'}
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {aberta && aindaSugerida && sugCat && (
+                  <p className="mt-3 flex items-center gap-1.5 text-xs font-medium text-brand">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Sugerida pelo seu histórico: igual a {sugCat.vezes} lançamento(s), como “{sugCat.exemplo.slice(0, 40)}”. Troque se não for isso.
+                  </p>
+                )}
+
+                {aberta && (
+                  <div className="mt-3">
+                    <label className="block text-sm font-medium text-ink-soft mb-1">
+                      Descrição
+                    </label>
+                    <input
+                      type="text"
+                      value={c.descricao ?? t.descricao}
+                      onChange={(e) => atualizarClassificacao(t.id, { descricao: e.target.value })}
+                      placeholder="Ex.: Mercado do mês, Presente da mãe..."
+                      className="w-full rounded-xl border border-line px-3.5 py-2.5 text-sm bg-surface"
+                    />
+                  </div>
                 )}
 
                 {aberta && t.tipo === 'DESPESA' && (
@@ -555,7 +713,7 @@ export function Bancos() {
                     <Button
                       variant="secondary"
                       icon={<Tags className="h-4 w-4" />}
-                      onClick={() => setAbertaId(t.id)}
+                      onClick={() => abrirCategorizar(t)}
                     >
                       Categorizar
                     </Button>
@@ -573,6 +731,8 @@ export function Bancos() {
           })}
         </ul>
       )}
+
+      <TransacoesIgnoradas ignoradas={ignoradas} onRestaurar={restaurar} />
     </div>
   )
 }

@@ -72,12 +72,19 @@ function parcelasEmAndamento(transacoes: PluggyTransacao[]) {
     .sort((a, b) => b.valorRestante - a.valorRestante)
 }
 
+/** A hora vem em UTC: o que o banco registra depois das 21h em Fortaleza cairia no dia seguinte. */
+function dataLocal(iso: string): string {
+  return new Date(new Date(iso).getTime() - 3 * 3_600_000).toISOString().slice(0, 10)
+}
+
 export function montarCartao(
   conta: PluggyConta,
   faturas: PluggyFatura[],
   transacoes: PluggyTransacao[],
   hoje: string,
-  banco: string
+  banco: string,
+  // pagamentos de fatura debitados na conta corrente: o cartão nem sempre mostra o pagamento adiantado
+  pagamentosDoBanco: PluggyTransacao[] = []
 ) {
   const ordenadas = [...faturas].sort((a, b) => b.dueDate.localeCompare(a.dueDate))
   const ultima = ordenadas[0]
@@ -126,6 +133,15 @@ export function montarCartao(
     )
     .sort((a, b) => a.date.localeCompare(b.date))
 
+  // o dinheiro pago paga primeiro a última fatura fechada; o que sobra abate a fatura aberta
+  const pagosNoBanco = pagamentosDoBanco
+    .filter((t) => t.amount < 0 && fechamentoUltima !== null && dataLocal(t.date) >= fechamentoUltima)
+    .sort((a, b) => a.date.localeCompare(b.date))
+  const totalPagoNoBanco = pagosNoBanco.reduce((s, t) => s + Math.abs(t.amount), 0)
+  const totalDaUltima = ultima?.totalAmount ?? 0
+  const pagoAdiantado = Math.min(Math.max(totalPagoNoBanco - totalDaUltima, 0), lancado + parcelasPrevistas)
+  const pagoDaUltimaNoCartao = pagamentos.reduce((s, t) => s + Math.abs(t.amount), 0)
+
   const encargosDe = (f: PluggyFatura) =>
     (f.financeCharges ?? []).reduce((s, c) => s + c.amount, 0)
 
@@ -144,6 +160,9 @@ export function montarCartao(
       lancado,
       parcelasPrevistas,
       total: lancado + parcelasPrevistas,
+      // pago antes de a fatura fechar; o que ainda falta é total - pago
+      pago: pagoAdiantado,
+      pagoEm: pagoAdiantado > 0 ? dataLocal(pagosNoBanco.at(-1)!.date) : null,
       compras,
     },
     ultimaFatura: ultima
@@ -153,7 +172,7 @@ export function montarCartao(
           vencimento: ultima.dueDate.slice(0, 10),
           total: ultima.totalAmount,
           minimo: ultima.minimumPaymentAmount ?? null,
-          pago: pagamentos.reduce((s, t) => s + Math.abs(t.amount), 0),
+          pago: Math.max(pagoDaUltimaNoCartao, Math.min(totalPagoNoBanco, totalDaUltima)),
           dataPagamento: pagamentos.at(-1)?.date.slice(0, 10) ?? null,
         }
       : null,

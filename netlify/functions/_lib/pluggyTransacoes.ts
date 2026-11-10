@@ -11,6 +11,11 @@ export function ehMovimentoInterno(t: PluggyTransacao): boolean {
   return CATEGORIAS_INTERNAS.has(t.category ?? '') || DESCRICOES_INTERNAS.test(t.description)
 }
 
+/** Pagamento de fatura que sai da conta corrente (a linha "PGTO CARTAO" do extrato). */
+export function ehPagamentoDeFatura(t: PluggyTransacao): boolean {
+  return t.category === 'Credit card payment' || DESCRICOES_INTERNAS.test(t.description)
+}
+
 /**
  * No cartão, pendente é compra da fatura aberta: fica assim até a fatura fechar, então entra na
  * fila (ao ser confirmada, mantém o mesmo id e não duplica). Só não entra parcela com data futura.

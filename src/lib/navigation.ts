@@ -12,6 +12,7 @@ import {
   ChartPie,
   Settings,
   ShieldCheck,
+  Scale,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -44,6 +45,7 @@ export const navItems: NavItem[] = [
   { to: '/', label: 'Início', icon: House, tom: 'violeta', grupo: 'visao' },
   { to: '/fluxo-de-caixa', label: 'Fluxo de caixa', icon: ChartNoAxesCombined, tom: 'violeta', masterOnly: true, grupo: 'visao' },
   { to: '/analise', label: 'Análise', icon: ChartPie, tom: 'violeta', grupo: 'visao' },
+  { to: '/dre', label: 'Resultado (DRE)', icon: Scale, tom: 'violeta', grupo: 'visao' },
   { to: '/despesas', label: 'Despesas', icon: ReceiptText, tom: 'vermelho', grupo: 'lancamentos' },
   { to: '/entradas', label: 'Entradas', icon: BanknoteArrowDown, tom: 'verde', grupo: 'lancamentos' },
   { to: '/orcamentos', label: 'Orçamentos', icon: Target, tom: 'ambar', grupo: 'planejamento' },

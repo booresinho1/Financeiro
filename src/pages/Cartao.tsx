@@ -105,7 +105,9 @@ function SituacaoUltimaFatura({ cartao, hoje }: { cartao: CartaoResumo; hoje: st
 
 function PainelFatura({ cartao, hoje }: { cartao: CartaoResumo; hoje: string }) {
   const { faturaAberta: f, limite, limiteDisponivel, usado } = cartao
-  const texto = formatCurrency(f.total)
+  // o que ainda falta pagar: pagamento adiantado (saído da conta do banco) já abateu da previsão
+  const falta = Math.max(f.total - f.pago, 0)
+  const texto = formatCurrency(falta)
   const virgula = texto.lastIndexOf(',')
   const percentual = limite ? Math.min(100, (usado / limite) * 100) : null
   const dias = f.vencimentoEstimado ? diasAte(f.vencimentoEstimado, hoje) : null
@@ -118,7 +120,9 @@ function PainelFatura({ cartao, hoje }: { cartao: CartaoResumo; hoje: string }) 
       />
       <div className="relative">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-medium text-white/60">Fatura aberta · previsão</p>
+          <p className="text-xs font-medium text-white/60">
+            {f.pago > 0 ? 'Fatura aberta · falta pagar' : 'Fatura aberta · previsão'}
+          </p>
           <span className="rounded-full border border-white/15 bg-white/5 px-2.5 py-0.5 text-[11px] text-white/70">
             {[cartao.bandeira, cartao.final && `final ${cartao.final}`].filter(Boolean).join(' · ') ||
               cartao.nome}
@@ -129,6 +133,14 @@ function PainelFatura({ cartao, hoje }: { cartao: CartaoResumo; hoje: string }) 
           {texto.slice(0, virgula)}
           <span className="text-[2.2rem] text-white/35">{texto.slice(virgula)}</span>
         </p>
+
+        {f.pago > 0 && (
+          <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85">
+            <CheckCircle2 className="h-3.5 w-3.5 text-accent" />
+            Já pagou {formatCurrency(f.pago)}
+            {f.pagoEm && ` em ${diaMes(f.pagoEm)}`} · de {formatCurrency(f.total)}
+          </p>
+        )}
 
         {f.vencimentoEstimado && (
           <div className="mt-4 flex flex-wrap items-center gap-2">

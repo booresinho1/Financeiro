@@ -1,32 +1,45 @@
 import { useMemo, useState } from 'react'
-import { Plus, CreditCard, ChevronDown, Ban, Check, Pencil, Wallet, CalendarCheck2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Plus, CreditCard, ChevronDown, Ban, Check, Pencil, Trash2, ArrowUpRight } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { DividaFormModal } from '@/components/dividas/DividaFormModal'
 import { RegistrarPagamentoModal } from '@/components/dividas/RegistrarPagamentoModal'
-import { EvolucaoDividasChart } from '@/components/dividas/EvolucaoDividasChart'
+import { LinhaDoTempoParcelas, ResumoParcelas } from '@/components/dividas/PainelParcelamentos'
+import { LinhaParcelamento } from '@/components/dividas/LinhaParcelamento'
 import { useDividas } from '@/hooks/useDividas'
 import { useParcelas } from '@/hooks/useParcelas'
 import { useDespesas } from '@/hooks/useDespesas'
+import { useEntradas } from '@/hooks/useEntradas'
+import { useCartoes } from '@/hooks/useCartoes'
+import { useAuth } from '@/contexts/AuthContext'
+import { EMAIL_MASTER } from '@/lib/navigation'
+import { useChartColors } from '@/lib/chartTheme'
 import { criarDividaComParcelas } from '@/lib/criarDividaComParcelas'
-import { calcularResumoDivida, statusEfetivoParcela } from '@/lib/dividaResumo'
+import { statusEfetivoParcela } from '@/lib/dividaResumo'
+import { montarParcelamentos } from '@/lib/parcelamentos'
 import { formatCurrency, formatDate } from '@/lib/format'
-import { somarMeses } from '@/lib/datas'
+import { hojeIso, somarMeses } from '@/lib/datas'
 import type { Divida, Parcela } from '@/types/finance'
 import type { NovaDivida } from '@/repositories/dividasRepository'
 
-function periodoAtual(): string {
-  return new Date().toISOString().slice(0, 7)
-}
-
 const STATUS_COR: Record<string, string> = {
-  PAGA: 'bg-brand-soft text-brand',
+  PAGA: 'bg-income-soft text-income',
   PENDENTE: 'bg-surface-2 text-ink-soft',
   ATRASADA: 'bg-expense-soft text-expense',
   CANCELADA: 'bg-surface-2 text-ink-faint line-through',
 }
 
+const ROTULO_STATUS: Record<string, string> = {
+  PAGA: 'Paga',
+  PENDENTE: 'A pagar',
+  ATRASADA: 'Atrasada',
+  CANCELADA: 'Cancelada',
+}
+
 export function Dividas() {
+  const { user } = useAuth()
+  const temBanco = user?.email === EMAIL_MASTER
   const {
     dividas,
     carregando,
@@ -42,46 +55,42 @@ export function Dividas() {
     recarregar: recarregarParcelas,
   } = useParcelas()
   const { despesas, criar: criarDespesa } = useDespesas()
+  const { entradas } = useEntradas()
+  const { cartoes } = useCartoes(temBanco)
+  const cores = useChartColors()
 
   const [modalDividaAberto, setModalDividaAberto] = useState(false)
   const [dividaEditando, setDividaEditando] = useState<Divida | undefined>()
-  const [dividaExpandida, setDividaExpandida] = useState<string | null>(null)
+  const [aberto, setAberto] = useState<string | null>(null)
+  const [verQuitadas, setVerQuitadas] = useState(false)
   const [parcelaPagando, setParcelaPagando] = useState<Parcela | null>(null)
-  const [mesInicial, setMesInicial] = useState(periodoAtual())
-  const [mesFinal, setMesFinal] = useState(somarMeses(`${periodoAtual()}-01`, 5).slice(0, 7))
 
-
-  const resumoGeral = useMemo(() => {
-    let totalRestante = 0
-    let previsaoTermino: string | null = null
-    for (const d of dividas) {
-      const resumo = calcularResumoDivida(d, parcelas)
-      totalRestante += resumo.totalRestante
-      if (
-        resumo.parcelasRestantes > 0 &&
-        resumo.dataPrevistaTermino &&
-        (!previsaoTermino || resumo.dataPrevistaTermino > previsaoTermino)
-      ) {
-        previsaoTermino = resumo.dataPrevistaTermino
-      }
-    }
-    return { totalRestante, previsaoTermino }
-  }, [dividas, parcelas])
-
-  function estaQuitada(divida: Divida): boolean {
-    const resumo = calcularResumoDivida(divida, parcelas)
-    return resumo.parcelasPagas > 0 && resumo.parcelasRestantes === 0
-  }
-
-  const dividasOrdenadas = useMemo(
-    () =>
-      [...dividas].sort((a, b) => {
-        const qa = estaQuitada(a) ? 1 : 0
-        const qb = estaQuitada(b) ? 1 : 0
-        return qa - qb
-      }),
-    [dividas, parcelas]
+  const hoje = hojeIso()
+  const resumo = useMemo(
+    () => montarParcelamentos(dividas, parcelas, cartoes, hoje),
+    [dividas, parcelas, cartoes, hoje]
   )
+
+  // a cor segue o parcelamento; depois das 5 primeiras, todas em cinza
+  const corDe = useMemo(() => {
+    const mapa: Record<string, string> = {}
+    resumo.itens.forEach((i, k) => {
+      mapa[i.id] = k < cores.composicao.length ? cores.composicao[k] : cores.inkMuted
+    })
+    return mapa
+  }, [resumo.itens, cores])
+
+  // média do que entrou nos 3 meses fechados antes deste: base para o "peso na receita"
+  const receitaMensal = useMemo(() => {
+    const mes = hoje.slice(0, 7)
+    const meses = [1, 2, 3].map((k) => somarMeses(`${mes}-01`, -k).slice(0, 7))
+    const soma = entradas
+      .filter((e) => e.status === 'RECEBIDA' && meses.includes(e.data.slice(0, 7)))
+      .reduce((s, e) => s + e.valor, 0)
+    return soma / 3
+  }, [entradas, hoje])
+
+  const encerradas = dividas.filter((d) => !resumo.itens.some((i) => i.idDivida === d.id))
 
   async function handleSalvarDivida(dados: NovaDivida) {
     if (dividaEditando) {
@@ -147,10 +156,93 @@ export function Dividas() {
     await atualizarParcela(parcelaPagando.id, { ...dados, idDespesa })
   }
 
+  function parcelasDaDivida(divida: Divida) {
+    const lista = parcelas
+      .filter((p) => p.idDivida === divida.id)
+      .sort((a, b) => a.numeroParcela - b.numeroParcela)
+    return (
+      <>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-ink-muted">
+            {formatCurrency(divida.valorTotal)} em {divida.numParcelas}x · clique em{' '}
+            <Check className="inline h-3.5 w-3.5 text-brand" /> quando pagar: a despesa é lançada sozinha
+          </p>
+          <span className="flex items-center gap-3">
+            <button
+              onClick={() => abrirEdicaoDivida(divida)}
+              className="flex items-center gap-1 text-xs font-semibold text-ink-soft hover:text-ink"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Editar
+            </button>
+            <button
+              onClick={() => handleExcluirDivida(divida)}
+              className="flex items-center gap-1 text-xs font-semibold text-expense"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Excluir
+            </button>
+          </span>
+        </div>
+        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+          {lista.map((p) => {
+            const status = statusEfetivoParcela(p)
+            const aPagar = p.status === 'PENDENTE'
+            return (
+              <div
+                key={p.id}
+                className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-xs ${
+                  status === 'ATRASADA' ? 'border-expense/40' : 'border-line-soft'
+                }`}
+              >
+                <div className="min-w-0">
+                  <p className="font-semibold text-ink">
+                    {p.numeroParcela}/{divida.numParcelas}
+                    <span className="ml-1.5 font-normal text-ink-muted">vence {formatDate(p.dataVencimento)}</span>
+                  </p>
+                  <span className={`mt-0.5 inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold ${STATUS_COR[status]}`}>
+                    {ROTULO_STATUS[status]}
+                    {p.status === 'PAGA' && p.dataPagamento && ` em ${formatDate(p.dataPagamento).slice(0, 5)}`}
+                  </span>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <span className="font-bold text-ink tabular-nums">{formatCurrency(p.valorPago || p.valorPrevisto)}</span>
+                  {aPagar && (
+                    <>
+                      <button
+                        onClick={() => setParcelaPagando(p)}
+                        className="flex items-center gap-1 rounded-lg bg-brand px-2 py-1 text-[11px] font-semibold text-white hover:bg-brand-hover"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                        Paguei
+                      </button>
+                      <button
+                        aria-label="Cancelar parcela"
+                        onClick={() => handleCancelarParcela(p)}
+                        className="rounded p-1 text-ink-faint hover:bg-surface-2"
+                      >
+                        <Ban className="h-3.5 w-3.5" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </>
+    )
+  }
+
   return (
     <>
       <PageHeader
-        title="Dívidas"
+        title="Parcelas e dívidas"
+        subtitle={
+          temBanco
+            ? 'As compras parceladas do cartão entram sozinhas; as de fora (carnê, boleto) você cadastra aqui'
+            : 'Cadastre suas dívidas parceladas e marque cada parcela quando pagar'
+        }
         action={
           <button
             onClick={abrirNovaDivida}
@@ -162,224 +254,91 @@ export function Dividas() {
         }
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-        <div className="rounded-2xl border border-line bg-surface shadow-lg shadow-expense/[0.12] overflow-hidden">
-          <div className="h-1 bg-gradient-to-r from-expense to-expense/0" />
-          <div className="p-5 flex items-center gap-3.5">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-expense-soft ring-1 ring-inset ring-white/5">
-              <Wallet className="h-5 w-5 text-expense" strokeWidth={2.1} />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-ink-muted">Total restante</p>
-              <p className="text-2xl font-bold text-ink mt-0.5 tracking-tight truncate">
-                {formatCurrency(resumoGeral.totalRestante)}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-line bg-surface shadow-lg shadow-brand/[0.12] overflow-hidden">
-          <div className="h-1 bg-gradient-to-r from-brand to-brand/0" />
-          <div className="p-5 flex items-center gap-3.5">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-soft ring-1 ring-inset ring-white/5">
-              <CalendarCheck2 className="h-5 w-5 text-brand" strokeWidth={2.1} />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-ink-muted">Previsão de término</p>
-              <p className="text-2xl font-bold text-ink mt-0.5 tracking-tight truncate">
-                {resumoGeral.previsaoTermino ? formatDate(resumoGeral.previsaoTermino) : 'Tudo quitado 🎉'}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {erro && (
-        <div className="mb-4 rounded-xl border border-expense/25 bg-expense-soft px-4 py-3 text-sm text-expense">
-          {erro}
-        </div>
-      )}
-
-      {!carregando && dividas.length > 0 && (
-        <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm shadow-slate-900/[0.02] mb-4">
-          <div className="flex items-center justify-between flex-wrap gap-3 mb-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-faint">
-              Evolução do comprometimento mensal
-            </span>
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <label className="text-xs text-ink-muted">De</label>
-              <input
-                type="month"
-                value={mesInicial}
-                max={mesFinal}
-                onChange={(e) => e.target.value && setMesInicial(e.target.value)}
-                className="min-w-0 rounded-lg border border-line px-2.5 py-1.5 text-sm text-ink-soft"
-              />
-              <label className="text-xs text-ink-muted">até</label>
-              <input
-                type="month"
-                value={mesFinal}
-                min={mesInicial}
-                onChange={(e) => e.target.value && setMesFinal(e.target.value)}
-                className="min-w-0 rounded-lg border border-line px-2.5 py-1.5 text-sm text-ink-soft"
-              />
-            </div>
-          </div>
-          <p className="text-xs text-ink-faint mb-2">Quanto vence em cada mês, somando todas as dívidas</p>
-          <EvolucaoDividasChart parcelas={parcelas} mesInicial={mesInicial} mesFinal={mesFinal} />
-        </div>
+        <div className="mb-4 rounded-xl border border-expense/25 bg-expense-soft px-4 py-3 text-sm text-expense">{erro}</div>
       )}
 
       {carregando ? (
-        <div className="rounded-2xl border border-line bg-surface py-16 text-center text-sm text-ink-muted shadow-sm shadow-slate-900/[0.02]">
-          Carregando dívidas...
+        <div className="rounded-2xl border border-line bg-surface py-16 text-center text-sm text-ink-muted">
+          Carregando parcelas...
         </div>
-      ) : dividas.length === 0 ? (
+      ) : resumo.itens.length === 0 && encerradas.length === 0 ? (
         <EmptyState
           icon={CreditCard}
-          title="Nenhuma dívida cadastrada"
-          description="Cadastre uma dívida parcelada e o app gera todas as parcelas automaticamente."
+          title="Nenhuma parcela em aberto"
+          description="Cadastre uma dívida parcelada (carnê, boleto, empréstimo) e o app gera todas as parcelas."
         />
       ) : (
-        <div className="space-y-3">
-          {dividasOrdenadas.map((divida) => {
-            const resumo = calcularResumoDivida(divida, parcelas)
-            const quitada = estaQuitada(divida)
-            const parcelasDaDivida = parcelas
-              .filter((p) => p.idDivida === divida.id)
-              .sort((a, b) => a.numeroParcela - b.numeroParcela)
-            const expandida = dividaExpandida === divida.id
-            const percentualPago =
-              divida.valorTotal > 0 ? (resumo.totalPago / divida.valorTotal) * 100 : 0
+        <div className="space-y-4">
+          <ResumoParcelas resumo={resumo} cores={corDe} receitaMensal={receitaMensal} />
+          <LinhaDoTempoParcelas resumo={resumo} cores={corDe} receitaMensal={receitaMensal} />
 
-            return (
-              <div
-                key={divida.id}
-                className={`rounded-2xl border border-line bg-surface p-4 shadow-sm shadow-slate-900/[0.02] ${
-                  quitada ? 'opacity-60' : ''
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className={`font-semibold ${quitada ? 'text-ink-faint' : 'text-ink'}`}>
-                      {divida.descricao}
-                    </p>
-                    <p className="text-xs text-ink-muted">
-                      {quitada ? (
-                        'Quitada ✓'
+          {resumo.itens.length > 0 && (
+            <section>
+              <h3 className="mb-2.5 text-base font-bold tracking-tight text-ink">
+                Parcelamentos em aberto <span className="font-semibold text-ink-faint">({resumo.itens.length})</span>
+              </h3>
+              <div className="space-y-2.5">
+                {resumo.itens.map((item) => {
+                  const divida = item.idDivida ? dividas.find((d) => d.id === item.idDivida) : undefined
+                  return (
+                    <LinhaParcelamento
+                      key={item.id}
+                      item={item}
+                      cor={corDe[item.id]}
+                      aberta={aberto === item.id}
+                      onAlternar={() => setAberto(aberto === item.id ? null : item.id)}
+                    >
+                      {divida ? (
+                        parcelasDaDivida(divida)
                       ) : (
-                        <>
-                          {resumo.parcelasPagas}/{divida.numParcelas} parcelas pagas
-                          {resumo.dataPrevistaTermino &&
-                            ` · Término previsto: ${formatDate(resumo.dataPrevistaTermino)}`}
-                        </>
+                        <p className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink-muted">
+                          <span>
+                            Cobrada junto com a fatura do cartão e lida do banco automaticamente: não precisa lançar
+                            nem marcar como paga.
+                          </span>
+                          <Link to="/cartao" className="flex items-center gap-0.5 font-semibold text-brand hover:underline">
+                            Ver no Cartão
+                            <ArrowUpRight className="h-3.5 w-3.5" />
+                          </Link>
+                        </p>
                       )}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <button
-                      onClick={() => abrirEdicaoDivida(divida)}
-                      className="flex items-center gap-1 text-xs font-medium text-ink-soft"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => handleExcluirDivida(divida)}
-                      className="text-xs font-medium text-expense"
-                    >
-                      Excluir
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-baseline justify-between mt-3">
-                  <span className={`text-lg font-semibold ${quitada ? 'text-ink-faint' : 'text-ink'}`}>
-                    {formatCurrency(resumo.totalPago)}
-                  </span>
-                  <span className="text-xs text-ink-muted">
-                    de {formatCurrency(divida.valorTotal)} · restam{' '}
-                    {formatCurrency(resumo.totalRestante)}
-                  </span>
-                </div>
-
-                <div className="h-2 rounded-full bg-surface-2 mt-2 overflow-hidden">
-                  <div
-                    className={`h-full ${quitada ? 'bg-ink-faint' : 'bg-brand'}`}
-                    style={{ width: `${Math.min(percentualPago, 100)}%` }}
-                  />
-                </div>
-
-                <button
-                  onClick={() => setDividaExpandida(expandida ? null : divida.id)}
-                  className="flex items-center gap-1 text-xs font-medium text-ink-soft mt-3"
-                >
-                  Ver parcelas
-                  <ChevronDown
-                    className={`h-3.5 w-3.5 transition-transform ${expandida ? 'rotate-180' : ''}`}
-                  />
-                </button>
-
-                {expandida && (
-                  <div className="mt-3 pt-3 border-t border-line-soft space-y-2">
-                    {parcelasDaDivida.map((p) => {
-                      const status = statusEfetivoParcela(p)
-                      return (
-                        <div
-                          key={p.id}
-                          className="flex items-center justify-between text-xs gap-2"
-                        >
-                          <div className="min-w-0">
-                            <p className="text-ink-soft">
-                              Parcela {p.numeroParcela}/{divida.numParcelas} ·{' '}
-                              {formatDate(p.dataVencimento)}
-                            </p>
-                            <span
-                              className={`inline-block mt-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium ${STATUS_COR[status]}`}
-                            >
-                              {status}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="font-medium text-ink-soft">
-                              {formatCurrency(p.valorPago || p.valorPrevisto)}
-                            </span>
-                            {p.status === 'PENDENTE' && (
-                              <>
-                                <button
-                                  aria-label="Marcar como paga"
-                                  onClick={() => setParcelaPagando(p)}
-                                  className="p-1 text-brand hover:bg-brand-soft rounded"
-                                >
-                                  <Check className="h-3.5 w-3.5" />
-                                </button>
-                                <button
-                                  aria-label="Cancelar parcela"
-                                  onClick={() => handleCancelarParcela(p)}
-                                  className="p-1 text-ink-faint hover:bg-surface-2 rounded"
-                                >
-                                  <Ban className="h-3.5 w-3.5" />
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
+                    </LinhaParcelamento>
+                  )
+                })}
               </div>
-            )
-          })}
+            </section>
+          )}
+
+          {encerradas.length > 0 && (
+            <section>
+              <button
+                type="button"
+                onClick={() => setVerQuitadas((v) => !v)}
+                className="flex items-center gap-1.5 text-sm font-semibold text-ink-muted hover:text-ink"
+              >
+                Quitadas ou encerradas ({encerradas.length})
+                <ChevronDown className={`h-4 w-4 transition-transform ${verQuitadas ? 'rotate-180' : ''}`} />
+              </button>
+              {verQuitadas && (
+                <div className="mt-2.5 space-y-2">
+                  {encerradas.map((d) => (
+                    <div key={d.id} className="rounded-2xl border border-line bg-surface p-4 opacity-80">
+                      <p className="mb-2 text-sm font-bold text-ink">
+                        {d.descricao} <span className="font-semibold text-income">· quitada</span>
+                      </p>
+                      {parcelasDaDivida(d)}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
         </div>
       )}
 
       {modalDividaAberto && (
-        <DividaFormModal
-          divida={dividaEditando}
-          onClose={() => setModalDividaAberto(false)}
-          onSubmit={handleSalvarDivida}
-        />
+        <DividaFormModal divida={dividaEditando} onClose={() => setModalDividaAberto(false)} onSubmit={handleSalvarDivida} />
       )}
 
       {parcelaPagando && (

@@ -24,7 +24,9 @@ import type { Despesa, TransacaoPendente } from '@/types/finance'
 import { CardsBancos } from '@/components/dashboard/CardsBancos'
 import { CalendarioMes } from '@/components/dashboard/CalendarioMes'
 import { ModalDetalhe } from '@/components/dashboard/ModalDetalhe'
-import { PainelCaixa, type CliqueCaixa } from '@/components/inicio/PainelCaixa'
+import { CabecalhoDre } from '@/components/dre/CabecalhoDre'
+import { FluxoDoMes } from '@/components/dre/FluxoDoMes'
+import { useDreMes } from '@/hooks/useDreMes'
 import { PainelOrcamentos } from '@/components/inicio/PainelOrcamentos'
 import { useAuth } from '@/contexts/AuthContext'
 import { EMAIL_MASTER } from '@/lib/navigation'
@@ -46,17 +48,8 @@ import { projetarFluxoCaixa } from '@/lib/fluxoCaixa'
 import { proximosVencimentos, orcamentosEstourados, vencimentosDoMes } from '@/lib/dashboardResumo'
 import { formatCurrency, formatDate, nomeBonito } from '@/lib/format'
 import { useChartColors } from '@/lib/chartTheme'
-import { detalheAPagar, detalheDespesas, type Detalhe } from '@/lib/detalhes'
-import {
-  calcularCaixa,
-  detalheEntradasPrevistas,
-  detalheFatura,
-  detalheSaldoContas,
-  detalheSobraDoMes,
-  resumirOrcamentos,
-  somarDias,
-  type LinhaOrcamento,
-} from '@/lib/inicio'
+import { detalheDespesas, type Detalhe } from '@/lib/detalhes'
+import { calcularCaixa, resumirOrcamentos, somarDias, type LinhaOrcamento } from '@/lib/inicio'
 import { hojeIso, somarMeses } from '@/lib/datas'
 
 const MESES = [
@@ -105,7 +98,7 @@ export function Dashboard() {
   const { metas } = useMetas()
   const { orcamentos } = useOrcamentos()
   const { bancos, carregando: carregandoBancos, erro: erroBancos } = useSaldosBancos(temBanco)
-  const { cartoes, carregando: carregandoCartoes, erro: erroCartoes } = useCartoes(temBanco)
+  const { cartoes, carregando: carregandoCartoes } = useCartoes(temBanco)
   const carregandoCaixa =
     carregandoBancos ||
     carregandoCartoes ||
@@ -176,12 +169,10 @@ export function Dashboard() {
     hoje
   )
 
-  const avisosCaixa = [
-    ...(erroBancos ? ['Não consegui ler os bancos: o saldo usa os lançamentos do app.'] : []),
-    ...(erroCartoes && caixa.origemSaldo === 'banco'
-      ? ['Não consegui ler o cartão: a fatura está fora dessa conta.']
-      : []),
-  ]
+  const dreMes = useDreMes(
+    { despesas, entradas, custosFixos, pagamentos: pagamentosCustosFixos, parcelas, dividas, orcamentos },
+    periodo
+  )
 
   const resumoOrcamentos = useMemo(
     () => resumirOrcamentos(orcamentos, despesas, periodo, hoje),
@@ -263,14 +254,15 @@ export function Dashboard() {
     }
     for (const c of cartoes) {
       const vencimento = c.faturaAberta.vencimentoEstimado
-      if (!vencimento || vencimento > somarDias(hoje, DIAS_AVISO_FATURA)) continue
+      const falta = Math.max(c.faturaAberta.total - c.faturaAberta.pago, 0)
+      if (!vencimento || vencimento > somarDias(hoje, DIAS_AVISO_FATURA) || falta < 1) continue
       lista.push({
         id: `fatura-${c.id}`,
         icone: CreditCard,
         texto: (
           <>
             Fatura {c.banco} vence ~{formatDate(vencimento).slice(0, 5)} ·{' '}
-            {formatCurrency(c.faturaAberta.total)}
+            {formatCurrency(falta)}
           </>
         ),
         to: '/cartao',
@@ -312,33 +304,6 @@ export function Dashboard() {
   )
 
   // --- modais de detalhe ---
-  function abrirCaixa(qual: CliqueCaixa) {
-    switch (qual) {
-      case 'saldo':
-        return setDetalhe(detalheSaldoContas(caixa, hoje, cores.income))
-      case 'entradas':
-        return setDetalhe(detalheEntradasPrevistas(caixa, cores.income))
-      case 'fatura':
-        return setDetalhe(detalheFatura(cartoes, cores.brand))
-      case 'parcelas':
-        return setDetalhe({
-          ...detalheAPagar(caixa.parcelas, cores.serieDespesa),
-          titulo: 'Parcelas de dívidas',
-          subtitulo: 'O que vence neste mês e o que ficou atrasado',
-          divisao: undefined,
-        })
-      case 'fixos':
-        return setDetalhe({
-          ...detalheAPagar(caixa.fixos, cores.composicao[2]),
-          titulo: 'Custos fixos do mês',
-          subtitulo: 'Ainda sem pagamento registrado',
-          divisao: undefined,
-        })
-      case 'sobra':
-        return setDetalhe(detalheSobraDoMes(caixa, caixa.sobra < 0 ? cores.expense : cores.income))
-    }
-  }
-
   function abrirOrcamento(l: LinhaOrcamento) {
     const titulo = l.subcategoria ? `${l.categoria} / ${l.subcategoria}` : l.categoria
     const totalSaiu = despesas
@@ -411,13 +376,8 @@ export function Dashboard() {
       )}
 
       <div className="space-y-4">
-        <PainelCaixa
-          caixa={caixa}
-          hoje={hoje}
-          carregando={carregandoCaixa}
-          avisos={avisosCaixa}
-          onClique={abrirCaixa}
-        />
+        <CabecalhoDre mes={periodo} onMes={setPeriodo} d={dreMes} />
+        <FluxoDoMes mes={periodo} d={dreMes} />
 
         <PainelOrcamentos
           resumo={resumoOrcamentos}
@@ -530,6 +490,7 @@ export function Dashboard() {
       </div>
 
       {detalhe && <ModalDetalhe detalhe={detalhe} onClose={() => setDetalhe(null)} />}
+      {dreMes.detalhe && <ModalDetalhe detalhe={dreMes.detalhe} onClose={dreMes.fecharDetalhe} />}
     </>
   )
 }

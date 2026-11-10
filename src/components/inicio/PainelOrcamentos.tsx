@@ -5,152 +5,100 @@ import { emojiDaCategoria } from '@/lib/emojiCategoria'
 import { formatCurrency, nomeBonito } from '@/lib/format'
 import type { LinhaOrcamento, ResumoOrcamentos, SituacaoOrcamento } from '@/lib/inicio'
 
-const TAMANHO = 112
-const ESPESSURA = 11
-const RAIO = (TAMANHO - ESPESSURA) / 2
-const CIRCUNFERENCIA = 2 * Math.PI * RAIO
-
-const ESTILO: Record<SituacaoOrcamento, { traco: string; texto: string; selo: string; rotulo: string }> = {
-  folga: {
-    traco: 'var(--color-income)',
-    texto: 'text-income',
-    selo: 'bg-income-soft text-income',
-    rotulo: '✅ Dentro do ritmo',
-  },
-  atencao: {
-    traco: 'var(--color-warning)',
-    texto: 'text-warning',
-    selo: 'bg-warning-soft text-warning',
-    rotulo: '⚠️ Atenção',
-  },
-  estourou: {
-    traco: 'var(--color-expense)',
-    texto: 'text-expense',
-    selo: 'bg-expense-soft text-expense',
-    rotulo: '🚨 Estourou',
-  },
+const ESTILO: Record<SituacaoOrcamento, { cor: string; texto: string; rotulo: string }> = {
+  folga: { cor: 'var(--color-income)', texto: 'text-income', rotulo: 'No ritmo' },
+  atencao: { cor: 'var(--color-warning)', texto: 'text-warning', rotulo: 'Atenção' },
+  estourou: { cor: 'var(--color-expense)', texto: 'text-expense', rotulo: 'Estourou' },
 }
 
-function Anel({
-  linha,
-  emoji,
-  fracaoDoMes,
-}: {
-  linha: LinhaOrcamento
-  emoji: string
-  fracaoDoMes: number
-}) {
-  const estilo = ESTILO[linha.situacao]
-  const preenchido = Math.min(linha.percentual, 100) / 100
-  const anguloHoje = fracaoDoMes * 360 - 90
-  const radianos = (anguloHoje * Math.PI) / 180
-  const centro = TAMANHO / 2
-  const externo = RAIO + ESPESSURA / 2 + 1
-  const interno = RAIO - ESPESSURA / 2 - 1
-
-  return (
-    <div className="relative shrink-0" style={{ width: TAMANHO, height: TAMANHO }}>
-      <svg width={TAMANHO} height={TAMANHO} viewBox={`0 0 ${TAMANHO} ${TAMANHO}`} aria-hidden>
-        <circle
-          cx={centro}
-          cy={centro}
-          r={RAIO}
-          fill="none"
-          stroke={`color-mix(in srgb, ${estilo.traco} 16%, transparent)`}
-          strokeWidth={ESPESSURA}
-        />
-        <circle
-          cx={centro}
-          cy={centro}
-          r={RAIO}
-          fill="none"
-          stroke={estilo.traco}
-          strokeWidth={ESPESSURA}
-          strokeLinecap="round"
-          strokeDasharray={CIRCUNFERENCIA}
-          strokeDashoffset={CIRCUNFERENCIA * (1 - preenchido)}
-          transform={`rotate(-90 ${centro} ${centro})`}
-          className="transition-[stroke-dashoffset] duration-700"
-        />
-        {fracaoDoMes > 0 && fracaoDoMes < 1 && (
-          <line
-            x1={centro + interno * Math.cos(radianos)}
-            y1={centro + interno * Math.sin(radianos)}
-            x2={centro + externo * Math.cos(radianos)}
-            y2={centro + externo * Math.sin(radianos)}
-            stroke="var(--color-ink)"
-            strokeWidth={2.5}
-            strokeLinecap="round"
-          />
-        )}
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-        <span className="text-[30px] leading-none" aria-hidden>
-          {emoji}
-        </span>
-        <span className={`mt-1 text-[11px] font-semibold ${estilo.texto}`}>
-          {linha.percentual.toFixed(0)}%
-        </span>
-      </div>
-    </div>
-  )
+function pct(v: number): string {
+  return `${v >= 10 ? Math.round(v) : v.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%`
 }
 
-function CardOrcamento({
+/**
+ * Uma categoria por linha: a barra mostra o que já foi gasto (cheio), o que o ritmo atual ainda
+ * deve gastar (claro) e o que passou do orçado (vermelho). O traço grosso é o orçado; o fino, onde o
+ * gasto deveria estar hoje.
+ */
+function LinhaCategoria({
   linha,
   fracaoDoMes,
-  ordem,
   onClick,
 }: {
   linha: LinhaOrcamento
   fracaoDoMes: number
-  ordem: number
   onClick: () => void
 }) {
   const estilo = ESTILO[linha.situacao]
   const nome = nomeBonito(linha.subcategoria || linha.categoria)
   const semGasto = linha.gasto === 0
+  const projecao = linha.projecao !== null && linha.projecao > linha.gasto ? linha.projecao : null
+  const escala = Math.max(linha.orcado, linha.gasto, projecao ?? 0) * 1.03
+  const pos = (v: number) => `${(v / escala) * 100}%`
+  const dentro = Math.min(linha.gasto, linha.orcado)
+  const excesso = Math.max(linha.gasto - linha.orcado, 0)
+  const hoje = fracaoDoMes > 0 && fracaoDoMes < 1 ? linha.orcado * fracaoDoMes : null
+
   return (
     <button
       type="button"
       onClick={onClick}
-      style={{
-        animationDelay: `${ordem * 50}ms`,
-        backgroundImage: `linear-gradient(135deg, color-mix(in srgb, ${estilo.traco} 10%, transparent), transparent 60%)`,
-      }}
-      className="animate-surgir group flex items-center gap-3.5 rounded-2xl border border-line bg-surface p-3.5 text-left shadow-card transition-all hover:-translate-y-0.5 hover:shadow-pop focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+      className="group grid w-full grid-cols-[minmax(0,130px)_1fr_auto] items-center gap-3 border-b border-line-soft px-1 py-2 text-left transition-colors hover:bg-surface-2/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand sm:grid-cols-[132px_1fr_124px] sm:gap-3"
     >
-      <Anel linha={linha} emoji={emojiDaCategoria(linha.subcategoria || linha.categoria)} fracaoDoMes={fracaoDoMes} />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold text-ink" title={nome}>
-          {nome}
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="text-lg leading-none" aria-hidden>
+          {emojiDaCategoria(linha.subcategoria || linha.categoria)}
         </span>
-        {linha.subcategoria && (
-          <span className="block truncate text-[11px] text-ink-faint">
-            {nomeBonito(linha.categoria)}
+        <span className="min-w-0">
+          <span className="block text-[13px] font-semibold leading-tight text-ink" title={nome}>
+            {nome}
           </span>
-        )}
-        <span className="mt-1 flex flex-wrap items-baseline gap-x-1.5">
-          <b className={`text-xl font-bold tracking-tight ${estilo.texto}`}>
-            {formatCurrency(Math.abs(linha.resta))}
-          </b>
-          <span className="text-[11px] text-ink-faint">{linha.resta < 0 ? 'acima' : 'restam'}</span>
+          {linha.subcategoria && <span className="block truncate text-[11px] text-ink-faint">{nomeBonito(linha.categoria)}</span>}
         </span>
-        <span className="block text-xs text-ink-muted">
-          {formatCurrency(linha.gasto)} de {formatCurrency(linha.orcado)}
+      </span>
+
+      <span className="block">
+        <span className="relative block h-3 overflow-hidden rounded-full bg-ink/[0.06] dark:bg-white/[0.07]">
+          {projecao !== null && (
+            <span
+              className="absolute inset-y-0 rounded-full"
+              style={{ left: 0, width: pos(projecao), background: `color-mix(in srgb, ${estilo.cor} 24%, transparent)` }}
+            />
+          )}
+          <span
+            className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-700"
+            style={{ width: pos(dentro), background: estilo.cor }}
+          />
+          {excesso > 0 && (
+            <span
+              className="absolute inset-y-0 rounded-r-full bg-expense"
+              style={{ left: pos(linha.orcado), width: pos(excesso) }}
+            />
+          )}
+          {hoje !== null && (
+            <span aria-hidden title="Onde o gasto deveria estar hoje" className="absolute inset-y-0 w-px bg-ink/45" style={{ left: pos(hoje) }} />
+          )}
+          <span aria-hidden className="absolute inset-y-0 w-0.5 bg-ink" style={{ left: `calc(${pos(linha.orcado)} - 1px)` }} />
         </span>
-        <span
-          className={`mt-2 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-            semGasto ? 'bg-surface-2 text-ink-muted' : estilo.selo
-          }`}
-        >
-          {semGasto ? '✨ Sem gasto ainda' : estilo.rotulo}
-        </span>
-        {linha.projecao !== null && linha.situacao !== 'estourou' && !semGasto && (
-          <span className="mt-1 block truncate text-[11px] text-ink-faint">
-            No ritmo, fecha em {formatCurrency(linha.projecao)}
+        <span className="mt-1 flex justify-between gap-2 whitespace-nowrap text-[11px] text-ink-muted tabular-nums">
+          <span>
+            <b className="font-semibold text-ink-soft">{formatCurrency(linha.gasto)}</b> de {formatCurrency(linha.orcado)}
           </span>
-        )}
+          {projecao !== null && linha.situacao !== 'estourou' && (
+            <span className={projecao > linha.orcado ? 'font-semibold text-warning' : ''}>fecha {formatCurrency(projecao)}</span>
+          )}
+        </span>
+      </span>
+
+      <span className="text-right leading-tight">
+        <span className={`block whitespace-nowrap text-[15px] font-extrabold tracking-tight tabular-nums ${semGasto ? 'text-ink-soft' : estilo.texto}`}>
+          {linha.resta < 0 ? '+' : ''}
+          {formatCurrency(Math.abs(linha.resta))}
+          <span className="ml-1 text-[10px] font-medium text-ink-muted">{linha.resta < 0 ? 'acima' : 'restam'}</span>
+        </span>
+        <span className={`block whitespace-nowrap text-[11px] font-semibold ${semGasto ? 'text-ink-faint' : estilo.texto}`}>
+          {semGasto ? 'sem gasto ainda' : `${pct(linha.percentual)} usado · ${estilo.rotulo}`}
+        </span>
       </span>
     </button>
   )
@@ -244,7 +192,7 @@ export function PainelOrcamentos({
           <PiggyBank className="mx-auto h-8 w-8 text-ink-faint" />
           <p className="mt-3 text-sm font-semibold text-ink">Nenhum orçamento definido ainda</p>
           <p className="mx-auto mt-1 max-w-md text-xs text-ink-muted">
-            Defina quanto quer gastar por mês em cada categoria. Cada uma vira um anel aqui, com o
+            Defina quanto quer gastar por mês em cada categoria. Cada uma vira uma barra aqui, com o
             quanto ainda pode gastar.
           </p>
           <Link
@@ -280,15 +228,26 @@ export function PainelOrcamentos({
             </div>
           )}
 
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {resumo.linhas.map((l, i) => (
-              <CardOrcamento
-                key={l.id}
-                linha={l}
-                fracaoDoMes={resumo.fracaoDoMes}
-                ordem={i}
-                onClick={() => onSelecionar(l)}
-              />
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-ink-muted">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-4 rounded-full bg-ink/25" /> gasto
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-4 rounded-full bg-ink/10" /> onde o ritmo leva
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-3 w-0.5 bg-ink" /> orçado
+            </span>
+            {resumo.fracaoDoMes > 0 && resumo.fracaoDoMes < 1 && (
+              <span className="flex items-center gap-1.5">
+                <span className="h-3 w-px bg-ink/45" /> onde deveria estar hoje
+              </span>
+            )}
+          </div>
+
+          <div className="mt-1 grid grid-cols-1 gap-x-8 xl:grid-cols-2">
+            {resumo.linhas.map((l) => (
+              <LinhaCategoria key={l.id} linha={l} fracaoDoMes={resumo.fracaoDoMes} onClick={() => onSelecionar(l)} />
             ))}
           </div>
         </>
