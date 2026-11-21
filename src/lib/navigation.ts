@@ -13,6 +13,7 @@ import {
   Settings,
   ShieldCheck,
   Scale,
+  Sparkles,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -50,6 +51,7 @@ export const navItems: NavItem[] = [
   { to: '/entradas', label: 'Entradas', icon: BanknoteArrowDown, tom: 'verde', grupo: 'lancamentos' },
   { to: '/orcamentos', label: 'Orçamentos', icon: Target, tom: 'ambar', grupo: 'planejamento' },
   { to: '/custos-fixos', label: 'Custos Fixos', icon: CalendarSync, tom: 'ambar', grupo: 'planejamento' },
+  { to: '/desejos', label: 'Desejos', icon: Sparkles, tom: 'ambar', grupo: 'planejamento' },
   { to: '/dividas', label: 'Dívidas', icon: HandCoins, tom: 'ambar', grupo: 'planejamento' },
   { to: '/contas', label: 'Contas', icon: Wallet, tom: 'azul', grupo: 'contas' },
   { to: '/cartao', label: 'Cartão', icon: CreditCard, tom: 'azul', masterOnly: true, grupo: 'contas' },
